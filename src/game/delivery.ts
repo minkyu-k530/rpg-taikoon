@@ -88,6 +88,9 @@ export class Delivery {
   obstacles: Obstacle[] = [];
   done = false;
 
+  /** 소리를 울리기 위한 통로. 로직은 오디오를 모른다 */
+  onEvent: ((e: 'jump' | 'hit' | 'arrive') => void) | null = null;
+
   constructor(opts: { count: number; clientId: string; clientName: string; special?: boolean }) {
     this.carried = opts.count;
     this.left = opts.count;
@@ -124,6 +127,7 @@ export class Delivery {
   doJump() {
     if (this.jump > 0) return false;
     this.jump = COURSE.jumpTime;
+    this.onEvent?.('jump');
     return true;
   }
 
@@ -149,6 +153,7 @@ export class Delivery {
     if (this.distance >= this.total) {
       this.distance = this.total;
       this.done = true;
+      this.onEvent?.('arrive');
     }
   }
 
@@ -167,6 +172,7 @@ export class Delivery {
       this.left -= loss;
       this.lost += loss;
       this.lastHit = { kind: o.kind, at: this.elapsed };
+      this.onEvent?.('hit');
       return;
     }
   }
@@ -184,8 +190,9 @@ function makeCourse(total: number): Obstacle[] {
   let id = 1;
   while (x < total - 12) {
     const t = x / total;
-    // 간격: 처음 18m → 끝 9m
-    const gap = 18 - t * 9;
+    // 간격: 처음 24m → 끝 13m.
+    // 18→9로 잡았더니 능숙하게 피해도 5개 중 2개만 도착했다. 피할 수 있어야 피하는 맛이 난다
+    const gap = 24 - t * 11;
     x += gap * (0.75 + Math.random() * 0.5);
     if (x >= total - 12) break;
 

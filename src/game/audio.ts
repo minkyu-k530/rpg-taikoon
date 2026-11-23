@@ -8,7 +8,7 @@
  *    눈이 오면 전체가 먹먹해진다. 녹음 파일로는 못 하는 것들이다.
  */
 
-export type SimEvent = 'flip' | 'sale' | 'unlock' | 'dayEnd';
+export type SimEvent = 'flip' | 'sale' | 'unlock' | 'dayEnd' | 'jump' | 'hit' | 'arrive';
 
 const MUTE_KEY = 'unjungcheon-bunsik-mute';
 
@@ -142,6 +142,20 @@ export class Audio {
       case 'dayEnd':
         this.blip(329.63, 1.4, 0.09, 'sine');
         this.blip(493.88, 1.4, 0.06, 'sine', 0.05);
+        break;
+      case 'jump':
+        // 발이 땅에서 떨어지는 짧은 소리
+        this.blip(520, 0.12, 0.12, 'triangle');
+        break;
+      case 'hit':
+        // 부딪히고 붕어빵이 떨어진다. 낮고 둔하게
+        this.blip(150, 0.22, 0.26, 'square');
+        this.tick(0.1);
+        break;
+      case 'arrive':
+        this.blip(392, 0.7, 0.1, 'sine');
+        this.blip(587.33, 0.8, 0.09, 'sine', 0.11);
+        this.blip(784, 1.1, 0.08, 'sine', 0.24);
         break;
     }
   }
