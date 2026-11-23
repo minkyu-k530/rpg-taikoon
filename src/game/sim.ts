@@ -802,12 +802,22 @@ export class Sim {
 
   /** 한 번에 들고 나갈 수 있는 최대 개수 */
   static readonly DELIVERY_MAX = 8;
-  /** 배달 단가. 가게에서 파는 값의 2.5배 */
-  static readonly DELIVERY_PRICE = 2500;
+  /** 나가려면 최소 이만큼은 있어야 한다 */
+  static readonly DELIVERY_MIN = 5;
+  /**
+   * 배달 단가. 가게 값(1,000원)의 3.5배.
+   * 2.5배로 잡았더니 **안 나가는 쪽이 항상 이득**이었다 — 45초 동안 줄이 비고
+   * 뒤집기도 못 하기 때문이다. 3.5배라야 알바를 갖췄을 때 비로소 나갈 이유가 생긴다
+   */
+  static readonly DELIVERY_PRICE = 3500;
 
-  /** 지금 배달을 나갈 수 있는가 */
+  /**
+   * 지금 배달을 나갈 수 있는가.
+   * 최소 5개를 요구한다 — 3개로 나가면 길에서 다 뺏기고 빈손으로 도착한다.
+   * 부탁을 받고 32초 동안 구워 채우는 것이 이 모드의 준비 과정이다
+   */
   canDeliver() {
-    return !this.delivery && this.open && !this.deliveredToday && this.tray.length >= 3;
+    return !this.delivery && this.open && !this.deliveredToday && this.tray.length >= Sim.DELIVERY_MIN;
   }
 
   /** 부탁을 받아들인다 */
@@ -829,6 +839,7 @@ export class Sim {
     const count = Math.min(Sim.DELIVERY_MAX, this.tray.length);
     this.tray.splice(0, count);
     this.delivery = new Delivery({ count, clientId, clientName, special });
+    this.delivery.onEvent = (e) => this.emit(e);
     return true;
   }
 
