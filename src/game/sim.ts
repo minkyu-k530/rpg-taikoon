@@ -6,7 +6,8 @@ import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind, type Up
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
-import { chapterForDay, CHAPTERS, SCENE_BY_DAY, type Chapter, type Scene } from './story';
+import { chapterForDay, CHAPTERS, FINAL_DAY, SCENE_BY_DAY, type Chapter, type Scene } from './story';
+import { HANDOVER_NEEDS, MOVE_PROFIT, type EndingId } from './endings';
 import { SEASONS } from './season';
 import type { SimEvent } from './audio';
 
@@ -100,6 +101,15 @@ export class Sim {
   open = true;
   report: DayReport | null = null;
 
+  /** 80일 동안 벌어들인 누적 순이익. 결말 B 조건 */
+  totalProfit = 0;
+  /** 마지막 밤에 결말을 고르는 중 */
+  choosingEnding = false;
+  /** 고른 결말. null이면 아직 */
+  ending: EndingId | null = null;
+  /** 지금까지 본 결말들. 2회차에서 회색으로 남는다 */
+  endingsSeen: Partial<Record<EndingId, true>> = {};
+
   /** 오늘 날씨. 내일 날씨는 마감 때 미리 보여 준다 */
   weather: Weather = rollWeather(SEASONS[CHAPTERS[0].season].weather);
   tomorrow: Weather = rollWeather(SEASONS[CHAPTERS[0].season].weather);
@@ -171,6 +181,8 @@ export class Sim {
     if (isWeather(data.weather)) this.weather = data.weather;
     if (isWeather(data.tomorrow)) this.tomorrow = data.tomorrow;
     this.seenScenes = { ...data.seenScenes };
+    this.totalProfit = data.totalProfit ?? 0;
+    this.endingsSeen = { ...data.endingsSeen };
     this.resetMolds();
   }
 
@@ -183,20 +195,19 @@ export class Sim {
       weather: this.weather,
       tomorrow: this.tomorrow,
       seenScenes: this.seenScenes,
+      totalProfit: this.totalProfit,
+      endingsSeen: this.endingsSeen,
     });
   }
 
+  /** 설정의 '저장 지우기'. 기록까지 전부 없앤다 */
   resetProgress() {
     storage.clear();
-    this.day = 1;
-    this.money = CONFIG.startMoney;
-    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
     this.visits = {};
     this.seenScenes = {};
-    this.nextDay();
-    this.day = 1;
-    this.scene = null;
-    this.maybeStartScene();
+    this.endingsSeen = {};
+    this.newRun();
+    storage.clear();
   }
 
   // ---------------------------------------------------------------- 틀
@@ -650,6 +661,61 @@ export class Sim {
       weather: this.weather,
       tomorrow: this.tomorrow,
     };
+    this.totalProfit += this.report.profit;
+    this.persist();
+  }
+
+  get isFinalDay() {
+    return this.day >= FINAL_DAY;
+  }
+
+  /**
+   * 결말을 고를 수 있는지. 못 고르면 왜 못 고르는지 같이 돌려준다.
+   * 숨기지 않는 게 원칙이다 (docs/STORY.md 4장)
+   */
+  endingStatus(id: EndingId): { available: boolean; reason: string | null } {
+    if (id === 'move') {
+      const short = MOVE_PROFIT - this.totalProfit;
+      if (short > 0) return { available: false, reason: `누적 순이익이 ${short.toLocaleString('ko-KR')}원 모자란다` };
+    }
+    if (id === 'handover') {
+      if (this.upg.helper < HANDOVER_NEEDS.helper) return { available: false, reason: '알바를 Lv.2까지 쓰지 않았다' };
+      if (this.upg.tteok < HANDOVER_NEEDS.tteok) return { available: false, reason: '떡볶이 솥이 없다' };
+      if (this.upg.sign < HANDOVER_NEEDS.sign) {
+        return { available: false, reason: `간판이 Lv.${this.upg.sign}다. Lv.${HANDOVER_NEEDS.sign}까지 올려야 한다` };
+      }
+    }
+    return { available: true, reason: null };
+  }
+
+  chooseEnding(id: EndingId) {
+    if (!this.endingStatus(id).available) return false;
+    this.ending = id;
+    this.endingsSeen[id] = true;
+    this.choosingEnding = false;
+    this.persist();
+    return true;
+  }
+
+  /** 2회차. 관계와 본 것은 남기고 날짜만 되돌린다 (docs/STORY.md 6장) */
+  newRun() {
+    this.day = 1;
+    this.money = CONFIG.startMoney;
+    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
+    this.totalProfit = 0;
+    this.ending = null;
+    this.choosingEnding = false;
+    this.dayTime = 0;
+    this.open = true;
+    this.report = null;
+    this.stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
+    this.todayUnlocks = [];
+    this.villagers = [];
+    this.queue = [];
+    this.tray = [];
+    this.tteokPot = { cooking: false, t: 0, servings: 0 };
+    this.resetMolds();
+    this.maybeStartScene();
     this.persist();
   }
 

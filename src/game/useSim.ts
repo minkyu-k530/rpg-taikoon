@@ -32,6 +32,11 @@ export interface Snapshot {
   season: Season;
   nightsLeft: number | null;
   scene: Sim['scene'];
+  choosingEnding: boolean;
+  ending: Sim['ending'];
+  endingsSeen: Sim['endingsSeen'];
+  totalProfit: number;
+  isFinalDay: boolean;
   report: Sim['report'];
 }
 
@@ -67,6 +72,11 @@ function read(): Snapshot {
     season: sim.chapter.season,
     nightsLeft: nightsLeft(sim.day),
     scene: sim.scene,
+    choosingEnding: sim.choosingEnding,
+    ending: sim.ending,
+    endingsSeen: { ...sim.endingsSeen },
+    totalProfit: sim.totalProfit,
+    isFinalDay: sim.isFinalDay,
     report: sim.report,
   };
 }
