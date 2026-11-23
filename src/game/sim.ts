@@ -101,6 +101,10 @@ export interface DeliveryResult {
   /** 들고 나간 개수 */
   carried: number;
   clientId: string;
+  /** 무사고 보너스 */
+  bonus: number;
+  /** 이번에 연속으로 피한 최고 수 */
+  bestCombo: number;
 }
 
 /** 손님의 배달 부탁 */
@@ -181,8 +185,8 @@ export class Sim {
    * 배달 중에도 아래 tick()은 그대로 돈다 — 자리를 비우는 대가가 이 모드의 핵심이다 (docs/DELIVERY.md)
    */
   delivery: Delivery | null = null;
-  /** 오늘 배달을 다녀왔는가. 하루 한 번 */
-  deliveredToday = false;
+  /** 오늘 몇 번 다녀왔는가. 간판 Lv.3이면 하루 두 번까지 */
+  deliveriesToday = 0;
   /** 방금 돌아온 배달의 결과. 화면에 띄워 둘 동안만 남는다 */
   deliveryResult: DeliveryResult | null = null;
   /** 손님이 지금 부탁하고 있는 배달. 받아들이거나 그냥 두면 사라진다 */
@@ -306,7 +310,8 @@ export class Sim {
     for (let i = this.villagers.length - 1; i >= 0; i--) {
       this.updateVillager(this.villagers[i], dt, i);
     }
-    if (this.dayTime >= CONFIG.dayLength) this.closeDay();
+    // 배달 나가 있는 동안에는 마감하지 않는다. 돌아올 때까지 기다려 준다
+    if (this.dayTime >= CONFIG.dayLength && !this.delivery) this.closeDay();
   }
 
   /** 떡볶이는 뒤집기 같은 조작이 없다. 오래 끓고, 다 팔리면 다시 끓는다 */
@@ -733,7 +738,7 @@ export class Sim {
    */
   private maybeOfferDelivery(clientId: string, clientName: string, stage: number) {
     if (this.day < CHAPTERS[1].startDay) return;
-    if (stage < 2 || this.deliveryOffer || this.delivery || this.deliveredToday) return;
+    if (stage < 2 || this.deliveryOffer || this.delivery || this.deliveriesLeft <= 0) return;
     // 진열대가 비어 있어도 부탁은 들어온다. 손님은 방금 사 갔으니 거의 항상 비어 있다.
     // 들고 갈 게 있느냐는 '수락할 때' 따진다 — 그동안 구워 채우는 게 이 부탁의 긴장이다
 
@@ -811,13 +816,21 @@ export class Sim {
    */
   static readonly DELIVERY_PRICE = 3500;
 
+  /** 연속 회피 하나당 보너스 */
+  static readonly DODGE_BONUS = 500;
+
+  /** 오늘 남은 배달 횟수. 간판을 끝까지 올리면 두 번 나갈 수 있다 */
+  get deliveriesLeft() {
+    return (this.upg.sign >= 3 ? 2 : 1) - this.deliveriesToday;
+  }
+
   /**
    * 지금 배달을 나갈 수 있는가.
    * 최소 5개를 요구한다 — 3개로 나가면 길에서 다 뺏기고 빈손으로 도착한다.
    * 부탁을 받고 32초 동안 구워 채우는 것이 이 모드의 준비 과정이다
    */
   canDeliver() {
-    return !this.delivery && this.open && !this.deliveredToday && this.tray.length >= Sim.DELIVERY_MIN;
+    return !this.delivery && this.open && this.deliveriesLeft > 0 && this.tray.length >= Sim.DELIVERY_MIN;
   }
 
   /** 부탁을 받아들인다 */
@@ -852,9 +865,21 @@ export class Sim {
     this.stats.revenue += revenue;
     this.stats.sold += d.left;
     if (d.left > 0) this.stats.customers++;
-    this.deliveredToday = true;
+    this.deliveriesToday++;
     this.delivery = null;
-    this.deliveryResult = { revenue, delivered: d.left, lost: d.lost, carried: d.carried, clientId: d.clientId };
+    // 연속으로 피한 만큼 보너스. 조심히 달릴 이유를 만든다
+    const bonus = d.bestCombo * Sim.DODGE_BONUS;
+    this.money += bonus;
+    this.stats.revenue += bonus;
+    this.deliveryResult = {
+      revenue: revenue + bonus,
+      bonus,
+      bestCombo: d.bestCombo,
+      delivered: d.left,
+      lost: d.lost,
+      carried: d.carried,
+      clientId: d.clientId,
+    };
 
     // 무사히 전한 만큼 관계가 쌓인다. 한 번에 몰아 주지는 않는다
     if (d.left > 0) {
@@ -888,7 +913,7 @@ export class Sim {
     this.upg = emptyUpgrades();
     this.totalProfit = 0;
     this.delivery = null;
-    this.deliveredToday = false;
+    this.deliveriesToday = 0;
     this.deliveryOffer = null;
     this.deliveryResult = null;
     this.ending = null;
@@ -918,7 +943,7 @@ export class Sim {
     this.stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
     this.todayUnlocks = [];
     this.delivery = null;
-    this.deliveredToday = false;
+    this.deliveriesToday = 0;
     this.villagers = [];
     this.queue = [];
     this.tray = [];

@@ -384,6 +384,14 @@ canvas {
   right: 0;
 }
 
+.chip-combo {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  color: var(--warm);
+  font-weight: 700;
+}
+
 /* 손님의 부탁. 화면을 막지 않는다 */
 .offer {
   position: absolute;

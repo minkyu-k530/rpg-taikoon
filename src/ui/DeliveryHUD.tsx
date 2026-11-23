@@ -31,6 +31,7 @@ export function DeliveryHUD() {
         <div className="chip">
           <span className="chip-label">{d.clientName}에게</span>
           <span className="chip-time">{d.left}개</span>
+          {d.combo >= 3 && <span className="chip-combo">연속 {d.combo}</span>}
         </div>
         <div className="chip small delivery-dist">
           {Math.round(d.distance)} / {d.total}m

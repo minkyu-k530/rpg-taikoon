@@ -119,6 +119,12 @@ function DeliveryResultPanel({ result }: { result: DeliveryResult }) {
                 <td>{result.lost}개</td>
               </tr>
             )}
+            {result.bestCombo > 0 && (
+              <tr className="muted">
+                <td>연속 회피 {result.bestCombo}</td>
+                <td>+{won(result.bonus)}</td>
+              </tr>
+            )}
             <tr className="sum">
               <td>받은 돈</td>
               <td>{won(result.revenue)}</td>
