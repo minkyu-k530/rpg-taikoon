@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { audio } from '../game/audio';
 import { Cutscene } from './Cutscene';
+import { Ending } from './Ending';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
 import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
 import { WEATHER } from '../game/weather';
@@ -64,7 +65,8 @@ export function HUD() {
       {snap.scene && <Cutscene scene={snap.scene} />}
       {bookOpen && <Book onClose={() => setBookOpen(false)} />}
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
-      {!snap.open && snap.report && <Settlement />}
+      {(snap.choosingEnding || snap.ending) && <Ending />}
+      {!snap.open && snap.report && !snap.choosingEnding && !snap.ending && <Settlement />}
     </>
   );
 }
@@ -255,12 +257,28 @@ function Settlement() {
           })}
         </div>
 
-        <p className="forecast">
-          내일은 <strong>{WEATHER[r.tomorrow].label}</strong> — {WEATHER[r.tomorrow].note}
-        </p>
-        <button className="primary" onClick={() => sim.nextDay()}>
-          다음 날 시작
-        </button>
+        {snap.isFinalDay ? (
+          <>
+            <p className="forecast">내일은 없다. 2월 말, 이 자리는 없어진다.</p>
+            <button
+              className="primary"
+              onClick={() => {
+                sim.choosingEnding = true;
+              }}
+            >
+              마지막 밤
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="forecast">
+              내일은 <strong>{WEATHER[r.tomorrow].label}</strong> — {WEATHER[r.tomorrow].note}
+            </p>
+            <button className="primary" onClick={() => sim.nextDay()}>
+              다음 날 시작
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
