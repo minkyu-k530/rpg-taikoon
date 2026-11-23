@@ -47,6 +47,13 @@ export const CONFIG = {
   oden: { cost: 400, price: 1000 },
 
   /**
+   * 떡볶이: 한 번에 오래 끓여 여러 그릇을 만든다.
+   * 객단가가 붕어빵의 네 배라 한 그릇이 팔릴 때 체감이 크고,
+   * 다 떨어지면 40초를 기다려야 해서 "지금 남았나"를 보게 된다.
+   */
+  tteok: { cost: 1200, price: 4000, time: 40, batch: 4 },
+
+  /**
    * 손님.
    * 생산량(틀 2개 × 14초 = 150초에 21개)과 수요가 맞아야 줄이 터지지 않는다.
    * 지나가는 사람은 많고(군중 연출), 그중 사는 사람은 적게 잡는다.
@@ -57,8 +64,9 @@ export const CONFIG = {
   /** 온풍기 레벨당 구매 확률 가산 */
   heaterBuyBonus: 0.05,
   browseChance: 0.3,
-  /** 어묵 해금 시 어묵을 고를 확률 */
-  odenPickChance: 0.45,
+  /** 해금된 메뉴를 고를 확률. 나머지는 붕어빵 */
+  odenPickChance: 0.4,
+  tteokPickChance: 0.25,
   queueMax: 6,
   /** 재고가 없을 때 기다려 주는 시간(초). 넘으면 화내지 않고 그냥 간다 */
   patience: 14,
@@ -69,6 +77,7 @@ export const CONFIG = {
     sign: { label: '간판', base: 15000, mult: 2.2, max: 3, desc: '지나가는 사람 +30%' },
     heater: { label: '온풍기', base: 12000, mult: 2.0, max: 3, desc: '사 먹을 확률 +5%p' },
     oden: { label: '어묵탕', base: 25000, mult: 1, max: 1, desc: '조작 없이 팔리는 메뉴 해금' },
+    tteok: { label: '떡볶이 솥', base: 60000, mult: 1, max: 1, desc: '4,000원짜리 메뉴 해금' },
     helper: { label: '알바', base: 45000, mult: 2.4, max: 2, desc: '뒤집기를 대신해 준다' },
   },
   /** 시작 틀 개수 */

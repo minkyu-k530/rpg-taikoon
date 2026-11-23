@@ -10,7 +10,7 @@ import type { SimEvent } from './audio';
 
 export type Phase = 'walk' | 'browse' | 'queue' | 'serve' | 'eat' | 'leave';
 export type Intent = 'pass' | 'browse' | 'buy';
-export type Menu = 'bungeoppang' | 'oden';
+export type Menu = 'bungeoppang' | 'oden' | 'tteok';
 
 export interface Villager {
   id: number;
@@ -102,9 +102,12 @@ export class Sim {
   weather: Weather = rollWeather();
   tomorrow: Weather = rollWeather();
 
-  upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0, helper: 0 };
+  upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
   /** shortfall: 손님이 원했지만 재고가 없어 못 준 개수. 날씨와 업그레이드 압력을 보여 주는 지표 */
   stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
+
+  /** 떡볶이 솥. 한 번 끓이면 batch 그릇이 나오고, 다 팔리면 다시 끓인다 */
+  tteokPot = { cooking: false, t: 0, servings: 0 };
 
   /** 주민 id별 누적 구매 횟수. 이 숫자가 단골 관계의 전부다 */
   visits: Record<string, number> = {};
@@ -161,7 +164,7 @@ export class Sim {
     storage.clear();
     this.day = 1;
     this.money = CONFIG.startMoney;
-    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0, helper: 0 };
+    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
     this.visits = {};
     this.nextDay();
     this.day = 1;
@@ -199,11 +202,34 @@ export class Sim {
     this.clock += dt;
     this.dayTime += dt;
     this.updateMolds(dt);
+    this.updateTteok(dt);
     this.updateSpawn(dt);
     for (let i = this.villagers.length - 1; i >= 0; i--) {
       this.updateVillager(this.villagers[i], dt, i);
     }
     if (this.dayTime >= CONFIG.dayLength) this.closeDay();
+  }
+
+  /** 떡볶이는 뒤집기 같은 조작이 없다. 오래 끓고, 다 팔리면 다시 끓는다 */
+  private updateTteok(dt: number) {
+    if (this.upg.tteok === 0) return;
+    const pot = this.tteokPot;
+    if (pot.cooking) {
+      pot.t += dt;
+      if (pot.t >= CONFIG.tteok.time) {
+        pot.cooking = false;
+        pot.t = 0;
+        pot.servings = CONFIG.tteok.batch;
+      }
+      return;
+    }
+    if (pot.servings > 0) return;
+    const batchCost = CONFIG.tteok.cost * CONFIG.tteok.batch;
+    if (this.money < batchCost) return;
+    this.money -= batchCost;
+    this.stats.cost += batchCost;
+    pot.cooking = true;
+    pot.t = 0;
   }
 
   private updateMolds(dt: number) {
@@ -303,6 +329,13 @@ export class Sim {
     return pool[pool.length - 1];
   }
 
+  /** 해금된 메뉴 중에서 고른다. 비싼 떡볶이를 먼저 묻고, 그다음 어묵, 나머지는 붕어빵 */
+  private pickMenu(): Menu {
+    if (this.upg.tteok > 0 && Math.random() < CONFIG.tteokPickChance) return 'tteok';
+    if (this.upg.oden > 0 && Math.random() < CONFIG.odenPickChance) return 'oden';
+    return 'bungeoppang';
+  }
+
   private makeVillager(def: ResidentDef): Villager {
     const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
     const roll = Math.random();
@@ -314,8 +347,7 @@ export class Sim {
       WEATHER[this.weather].buy;
     const intent: Intent =
       roll < buyChance ? 'buy' : roll < buyChance + CONFIG.browseChance ? 'browse' : 'pass';
-    const menu: Menu =
-      this.upg.oden > 0 && Math.random() < CONFIG.odenPickChance ? 'oden' : 'bungeoppang';
+    const menu = this.pickMenu();
     return {
       id: this.nextId++,
       residentId: def.id,
@@ -510,7 +542,14 @@ export class Sim {
     let n = 0;
     let revenue = 0;
 
-    if (v.menu === 'oden') {
+    if (v.menu === 'tteok') {
+      // 떡볶이는 한 사람이 한 그릇. 솥이 비면 다 끓을 때까지 기다린다
+      if (this.tteokPot.servings === 0) return false;
+      this.tteokPot.servings--;
+      n = 1;
+      revenue = CONFIG.tteok.price;
+      this.money += revenue;
+    } else if (v.menu === 'oden') {
       n = v.qty;
       revenue = n * CONFIG.oden.price;
       this.money += revenue - n * CONFIG.oden.cost;
@@ -597,6 +636,7 @@ export class Sim {
     this.villagers = [];
     this.queue = [];
     this.tray = [];
+    this.tteokPot = { cooking: false, t: 0, servings: 0 };
     this.resetMolds();
     this.persist();
   }

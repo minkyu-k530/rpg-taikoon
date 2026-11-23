@@ -25,6 +25,7 @@ export interface Snapshot {
   molds: { baking: boolean; t: number; flipped: boolean; burnt: boolean }[];
   upg: Upgrades;
   visits: Record<string, number>;
+  tteokServings: number;
   weather: Weather;
   report: Sim['report'];
 }
@@ -55,6 +56,7 @@ function read(): Snapshot {
     molds: sim.molds.map((m) => ({ baking: m.baking, t: m.t, flipped: m.flipped, burnt: m.burnt })),
     upg: { ...sim.upg },
     visits: { ...sim.visits },
+    tteokServings: sim.tteokPot.servings,
     weather: sim.weather,
     report: sim.report,
   };

@@ -99,6 +99,9 @@ export function Stall() {
         </group>
       )}
 
+      {/* 떡볶이 솥 */}
+      {snap.upg.tteok > 0 && <TteokPot />}
+
       {/* 간판 */}
       {snap.upg.sign > 0 && (
         <group position={[S.x, 2.75, S.z - 1.0]}>
@@ -124,6 +127,42 @@ export function Stall() {
     </group>
   );
 }
+
+/**
+ * 떡볶이 솥. 끓는 동안 표면이 일렁이고, 남은 그릇 수에 따라 색이 달라진다.
+ * 솥이 비면 눈에 띄게 어두워져서 "지금 없다"를 멀리서도 알 수 있다.
+ */
+function TteokPot() {
+  const surface = useRef<THREE.Mesh>(null);
+  const mat = useRef<THREE.MeshStandardMaterial>(null);
+
+  useFrame(() => {
+    const pot = sim.tteokPot;
+    const t = performance.now() * 0.001;
+    if (surface.current) {
+      surface.current.position.y = pot.cooking ? 0.14 + Math.sin(t * 5) * 0.006 : 0.13;
+    }
+    if (mat.current) {
+      const hot = pot.servings > 0 ? 1 : pot.cooking ? 0.45 : 0.15;
+      mat.current.emissiveIntensity = 0.25 + hot * 0.55;
+      mat.current.color.setRGB(0.62 * hot + 0.08, 0.16 * hot + 0.04, 0.1 * hot + 0.03);
+    }
+  });
+
+  return (
+    <group position={[S.x - 1.65, 1.12, S.z - 0.3]}>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.36, 0.33, 0.24, 18]} />
+        <meshStandardMaterial color="#2f3439" roughness={0.45} metalness={0.55} />
+      </mesh>
+      <mesh ref={surface} position={[0, 0.14, 0]}>
+        <cylinderGeometry args={[0.33, 0.33, 0.02, 18]} />
+        <meshStandardMaterial ref={mat} color="#9e2a18" emissive="#8a1f10" emissiveIntensity={0.5} roughness={0.35} />
+      </mesh>
+    </group>
+  );
+}
+
 
 /**
  * 카운터 뒤에 선 사람. 굽는 틀이 있으면 팔을 움직이고, 없으면 가볍게 흔들린다.
