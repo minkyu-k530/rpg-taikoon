@@ -22,3 +22,4 @@ pnpm-debug.log*
 # 테스트/임시
 coverage/
 .tmp/
+.vite/

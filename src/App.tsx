@@ -46,7 +46,7 @@ function CameraRig() {
     // 세로 화면은 화각을 넓혀야 산책로가 담긴다. 시선을 높게 둬야 건너편 오피스가 프레임에 들어온다
     const perspective = camera as THREE.PerspectiveCamera;
     perspective.fov = portrait ? 54 : 40;
-    perspective.position.set(-4.2, portrait ? 4.6 : 3.9, portrait ? -15 : -13.5);
+    perspective.position.set(-4.2, portrait ? 4.6 : 3.6, portrait ? -15 : -11.5);
     perspective.lookAt(3.4, 2.1, 0.5);
     perspective.updateProjectionMatrix();
   }, [camera, size]);

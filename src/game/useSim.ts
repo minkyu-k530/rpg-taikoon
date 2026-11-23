@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CONFIG } from './config';
+import type { Look } from './residents';
 import { Sim } from './sim';
 
 /** 시뮬레이션 인스턴스는 하나. 렌더러는 이걸 읽기만 한다 */
@@ -22,6 +23,7 @@ export interface Snapshot {
   crowd: number;
   molds: { baking: boolean; t: number; flipped: boolean; burnt: boolean }[];
   upg: { mold: number; sign: number; heater: number; oden: number };
+  visits: Record<string, number>;
   report: Sim['report'];
 }
 
@@ -50,19 +52,22 @@ function read(): Snapshot {
     crowd: sim.villagers.length,
     molds: sim.molds.map((m) => ({ baking: m.baking, t: m.t, flipped: m.flipped, burnt: m.burnt })),
     upg: { ...sim.upg },
+    visits: { ...sim.visits },
     report: sim.report,
   };
 }
 
 export interface CrowdMember {
   id: number;
-  skin: string;
-  top: string;
-  bottom: string;
-  height: number;
+  look: Look;
+  name: string | null;
+  speech: string | null;
 }
 
-/** 주민 명단(생성·소멸)만 10Hz로 동기화한다. 위치는 useFrame이 직접 읽는다 */
+/**
+ * 주민 명단과 머리 위 글자만 10Hz로 동기화한다. 위치는 useFrame이 직접 읽는다.
+ * 이름·대사가 바뀔 때만 리렌더하도록 직접 비교한다.
+ */
 export function useRoster(hz = 10): CrowdMember[] {
   const [roster, setRoster] = useState<CrowdMember[]>([]);
   useEffect(() => {
@@ -70,13 +75,14 @@ export function useRoster(hz = 10): CrowdMember[] {
       setRoster((prev) => {
         const next = sim.villagers.map((v) => ({
           id: v.id,
-          skin: v.skin,
-          top: v.top,
-          bottom: v.bottom,
-          height: v.height,
+          look: v.look,
+          name: v.name,
+          speech: v.speech,
         }));
-        if (prev.length === next.length && prev.every((p, i) => p.id === next[i].id)) return prev;
-        return next;
+        const same =
+          prev.length === next.length &&
+          prev.every((p, i) => p.id === next[i].id && p.name === next[i].name && p.speech === next[i].speech);
+        return same ? prev : next;
       });
     }, 1000 / hz);
     return () => clearInterval(id);

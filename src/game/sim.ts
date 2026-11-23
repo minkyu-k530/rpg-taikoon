@@ -2,7 +2,9 @@
  * 게임 시뮬레이션. React와 Three.js에 의존하지 않는 순수 로직이다.
  * 렌더러는 매 프레임 이 객체의 값을 읽기만 한다.
  */
-import { CONFIG, LAYOUT, PALETTE, pick, queueSlot, rand, upgradeCost, type UpgradeKind } from './config';
+import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind } from './config';
+import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
+import * as storage from './save';
 
 export type Phase = 'walk' | 'browse' | 'queue' | 'serve' | 'eat' | 'leave';
 export type Intent = 'pass' | 'browse' | 'buy';
@@ -10,11 +12,14 @@ export type Menu = 'bungeoppang' | 'oden';
 
 export interface Villager {
   id: number;
+  residentId: string;
+  look: Look;
+  /** 이름이 보이려면 3회 이상 와야 한다 */
+  name: string | null;
   x: number;
   z: number;
   vx: number;
   vz: number;
-  /** 보행 속도(m/s). 개인차가 군중의 자연스러움을 만든다 */
   speed: number;
   dir: 1 | -1;
   laneZ: number;
@@ -30,13 +35,10 @@ export interface Villager {
   facing: number;
   /** 걷기 애니메이션 위상 */
   anim: number;
-  /** 외형 */
-  height: number;
-  skin: string;
-  top: string;
-  bottom: string;
-  /** 음식을 들고 있는가 */
   carrying: boolean;
+  /** 머리 위에 띄울 대사. null이면 없음 */
+  speech: string | null;
+  speechUntil: number;
 }
 
 export interface Mold {
@@ -48,6 +50,13 @@ export interface Mold {
   cooldown: number;
 }
 
+export interface Unlock {
+  residentId: string;
+  name: string;
+  stage: number;
+  stageLabel: string;
+}
+
 export interface DayReport {
   day: number;
   customers: number;
@@ -56,6 +65,7 @@ export interface DayReport {
   cost: number;
   profit: number;
   missed: number;
+  unlocks: Unlock[];
 }
 
 export interface Upgrades {
@@ -66,6 +76,8 @@ export interface Upgrades {
 }
 
 const SEP_RADIUS_SQ = 0.81;
+/** 말풍선 표시 시간(초) */
+const SPEECH_TIME = 4.5;
 
 export class Sim {
   villagers: Villager[] = [];
@@ -73,7 +85,7 @@ export class Sim {
   molds: Mold[] = [];
   tray: { burnt: boolean }[] = [];
 
-  money = CONFIG.startMoney;
+  money: number = CONFIG.startMoney;
   day = 1;
   dayTime = 0;
   open = true;
@@ -82,12 +94,49 @@ export class Sim {
   upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0 };
   stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0 };
 
+  /** 주민 id별 누적 구매 횟수. 이 숫자가 단골 관계의 전부다 */
+  visits: Record<string, number> = {};
+  /** 오늘 올라간 단계 */
+  todayUnlocks: Unlock[] = [];
+
+  /** 시작 후 누적 시간(초). 말풍선 타이머에 쓴다 */
+  clock = 0;
+
   private nextId = 1;
   private spawnTimer = 0;
 
   constructor() {
     this.resetMolds();
+    this.restore();
   }
+
+  // ---------------------------------------------------------------- 저장
+
+  private restore() {
+    const data = storage.load();
+    if (!data) return;
+    this.day = data.day;
+    this.money = data.money;
+    this.upg = { ...this.upg, ...data.upg };
+    this.visits = { ...data.visits };
+    this.resetMolds();
+  }
+
+  persist() {
+    storage.save({ day: this.day, money: this.money, upg: this.upg, visits: this.visits });
+  }
+
+  resetProgress() {
+    storage.clear();
+    this.day = 1;
+    this.money = CONFIG.startMoney;
+    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0 };
+    this.visits = {};
+    this.nextDay();
+    this.day = 1;
+  }
+
+  // ---------------------------------------------------------------- 틀
 
   get moldCount() {
     return CONFIG.baseMolds + this.upg.mold;
@@ -115,6 +164,7 @@ export class Sim {
     // 탭 전환 등으로 dt가 튀면 시뮬레이션이 한 번에 점프한다. 상한을 건다
     dt = Math.min(dt, 0.1);
 
+    this.clock += dt;
     this.dayTime += dt;
     this.updateMolds(dt);
     this.updateSpawn(dt);
@@ -123,8 +173,6 @@ export class Sim {
     }
     if (this.dayTime >= CONFIG.dayLength) this.closeDay();
   }
-
-  // ---------------------------------------------------------------- 붕어빵 틀
 
   private updateMolds(dt: number) {
     for (const m of this.molds) {
@@ -167,29 +215,64 @@ export class Sim {
 
   // ---------------------------------------------------------------- 손님 생성
 
+  /** 가족 같은 사이가 된 단골은 다른 손님을 데려온다 (GDD 7-2) */
+  private get referralBonus() {
+    let bonus = 0;
+    for (const [id, v] of Object.entries(this.visits)) {
+      if (favorStage(v) >= 4 && RESIDENT_BY_ID.get(id)?.name) bonus += 0.08;
+    }
+    return bonus;
+  }
+
   private updateSpawn(dt: number) {
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
-    const rate = 1 + 0.3 * this.upg.sign;
+    const rate = 1 + 0.3 * this.upg.sign + this.referralBonus;
     this.spawnTimer = (CONFIG.spawnInterval / rate) * rand(0.6, 1.4);
     if (this.villagers.length >= CONFIG.maxVillagers) return;
-    this.villagers.push(this.makeVillager());
+    const def = this.pickResident();
+    if (def) this.villagers.push(this.makeVillager(def));
   }
 
-  private makeVillager(): Villager {
+  /**
+   * 명부에서 한 명 뽑는다. 이미 거리에 있는 사람은 제외한다.
+   * 단골 후보에 가중치를 더 주지 않으면 얼굴이 익을 만큼 자주 오지 않는다.
+   */
+  private pickResident(): ResidentDef | null {
+    const present = new Set(this.villagers.map((v) => v.residentId));
+    const pool = RESIDENTS.filter((r) => !present.has(r.id));
+    if (pool.length === 0) return null;
+    const total = pool.reduce((s, r) => s + r.weight, 0);
+    let roll = Math.random() * total;
+    for (const r of pool) {
+      roll -= r.weight;
+      if (roll <= 0) return r;
+    }
+    return pool[pool.length - 1];
+  }
+
+  private makeVillager(def: ResidentDef): Villager {
     const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-    const r = Math.random();
-    const buyChance = CONFIG.buyChance + CONFIG.heaterBuyBonus * this.upg.heater;
-    const intent: Intent = r < buyChance ? 'buy' : r < buyChance + CONFIG.browseChance ? 'browse' : 'pass';
+    const roll = Math.random();
+    const visits = this.visits[def.id] ?? 0;
+    const stage = favorStage(visits);
+    // 단골일수록 사러 올 확률이 높다. 관계가 수치로 돌아오는 유일한 지점
+    const buyChance =
+      CONFIG.buyChance + CONFIG.heaterBuyBonus * this.upg.heater + (def.name ? stage * 0.08 : 0);
+    const intent: Intent =
+      roll < buyChance ? 'buy' : roll < buyChance + CONFIG.browseChance ? 'browse' : 'pass';
     const menu: Menu =
       this.upg.oden > 0 && Math.random() < CONFIG.odenPickChance ? 'oden' : 'bungeoppang';
     return {
       id: this.nextId++,
+      residentId: def.id,
+      look: def.look,
+      name: def.name && stage >= 1 ? def.name : null,
       x: dir === 1 ? LAYOUT.minX : LAYOUT.maxX,
       z: rand(LAYOUT.laneMinZ, LAYOUT.laneMaxZ),
       vx: 0,
       vz: 0,
-      speed: rand(1.05, 1.55),
+      speed: def.look.speed,
       dir,
       laneZ: rand(LAYOUT.laneMinZ, LAYOUT.laneMaxZ),
       phase: 'walk',
@@ -203,11 +286,9 @@ export class Sim {
       spotZ: 0,
       facing: dir === 1 ? Math.PI / 2 : -Math.PI / 2,
       anim: Math.random() * 10,
-      height: rand(0.92, 1.08),
-      skin: pick(PALETTE.skin),
-      top: pick(PALETTE.top),
-      bottom: pick(PALETTE.bottom),
       carrying: false,
+      speech: null,
+      speechUntil: 0,
     };
   }
 
@@ -265,6 +346,8 @@ export class Sim {
   }
 
   private updateVillager(v: Villager, dt: number, index: number) {
+    if (v.speech && this.clock > v.speechUntil) v.speech = null;
+
     switch (v.phase) {
       case 'walk': {
         this.move(v, dt, this.exitX(v), v.laneZ);
@@ -370,29 +453,58 @@ export class Sim {
 
   /** 맨 앞 손님에게 판매. 팔았으면 true */
   private serveFront(v: Villager): boolean {
-    if (v.menu === 'oden') {
-      const n = v.qty;
-      const revenue = n * CONFIG.oden.price;
-      const cost = n * CONFIG.oden.cost;
-      this.money += revenue - cost;
-      this.stats.revenue += revenue;
-      this.stats.cost += cost;
-      this.stats.sold += n;
-      this.stats.customers++;
-      return true;
-    }
-    if (this.tray.length === 0) return false;
-    const n = Math.min(v.qty, this.tray.length);
+    let n = 0;
     let revenue = 0;
-    for (let i = 0; i < n; i++) {
-      const item = this.tray.shift()!;
-      revenue += item.burnt ? CONFIG.bake.burntPrice : CONFIG.bake.price;
+
+    if (v.menu === 'oden') {
+      n = v.qty;
+      revenue = n * CONFIG.oden.price;
+      this.money += revenue - n * CONFIG.oden.cost;
+      this.stats.cost += n * CONFIG.oden.cost;
+    } else {
+      if (this.tray.length === 0) return false;
+      n = Math.min(v.qty, this.tray.length);
+      for (let i = 0; i < n; i++) {
+        const item = this.tray.shift()!;
+        revenue += item.burnt ? CONFIG.bake.burntPrice : CONFIG.bake.price;
+      }
+      this.money += revenue;
     }
-    this.money += revenue;
+
     this.stats.revenue += revenue;
     this.stats.sold += n;
     this.stats.customers++;
+    this.recordVisit(v);
     return true;
+  }
+
+  /** 관계 갱신. 단계가 오르면 대사가 열린다 */
+  private recordVisit(v: Villager) {
+    const def = RESIDENT_BY_ID.get(v.residentId);
+    if (!def) return;
+    const before = this.visits[v.residentId] ?? 0;
+    const after = before + 1;
+    this.visits[v.residentId] = after;
+    if (!def.name) return;
+
+    const prevStage = favorStage(before);
+    const stage = favorStage(after);
+    if (stage > prevStage) {
+      const unlock: Unlock = {
+        residentId: def.id,
+        name: def.name,
+        stage,
+        stageLabel: ['모르는 사람', '눈에 익음', '단골', '아는 사이', '가족 같은'][stage],
+      };
+      this.todayUnlocks.push(unlock);
+      v.name = def.name;
+    }
+
+    const lines = unlockedLines(def, after);
+    if (lines.length > 0 && Math.random() < 0.75) {
+      v.speech = lines[(Math.random() * lines.length) | 0];
+      v.speechUntil = this.clock + SPEECH_TIME;
+    }
   }
 
   // ---------------------------------------------------------------- 하루
@@ -407,7 +519,9 @@ export class Sim {
       cost: this.stats.cost,
       profit: this.stats.revenue - this.stats.cost,
       missed: this.stats.missed,
+      unlocks: this.todayUnlocks,
     };
+    this.persist();
   }
 
   nextDay() {
@@ -416,10 +530,12 @@ export class Sim {
     this.open = true;
     this.report = null;
     this.stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0 };
+    this.todayUnlocks = [];
     this.villagers = [];
     this.queue = [];
     this.tray = [];
     this.resetMolds();
+    this.persist();
   }
 
   // ---------------------------------------------------------------- 업그레이드
@@ -435,6 +551,7 @@ export class Sim {
     this.money -= upgradeCost(kind, this.upg[kind]);
     this.upg[kind]++;
     if (kind === 'mold') this.resetMolds();
+    this.persist();
     return true;
   }
 }
