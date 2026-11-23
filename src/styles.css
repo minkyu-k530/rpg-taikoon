@@ -1,0 +1,288 @@
+:root {
+  --bg: #0a0e16;
+  --fg: #efe6d8;
+  --muted: #9aa3b0;
+  --warm: #ffb257;
+  --panel: rgba(16, 20, 28, 0.86);
+  --border: rgba(255, 255, 255, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  touch-action: manipulation;
+}
+
+/* ---------------------------------------------------------------- 상단 */
+
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 0;
+  pointer-events: none;
+}
+
+.chip {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(6px);
+}
+
+.chip-label {
+  color: var(--muted);
+  margin-right: 8px;
+}
+
+.chip-time {
+  font-weight: 600;
+}
+
+.chip.money {
+  color: var(--warm);
+  font-weight: 700;
+}
+
+.chip.small {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- 하단 */
+
+.hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.molds {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mold {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  font-family: inherit;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+
+.mold:active {
+  transform: scale(0.94);
+}
+
+.mold-fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: rgba(255, 178, 87, 0.22);
+  transition: height 0.1s linear;
+}
+
+.mold-text {
+  position: relative;
+}
+
+.mold.ready {
+  border-color: var(--warm);
+  color: #1a1206;
+  background: var(--warm);
+  font-weight: 700;
+  animation: pulse 0.7s ease-in-out infinite;
+}
+
+.mold.burnt .mold-text {
+  color: #c88b5a;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 178, 87, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 178, 87, 0);
+  }
+}
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- 정산 */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 7, 12, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+}
+
+.sheet {
+  width: min(420px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  background: #121722;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 22px;
+}
+
+.sheet h2 {
+  margin: 0 0 14px;
+  font-size: 19px;
+}
+
+.sheet h3 {
+  margin: 20px 0 10px;
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.report {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.report td {
+  padding: 6px 0;
+}
+
+.report td:last-child {
+  text-align: right;
+}
+
+.report .neg td:last-child,
+.report td.neg {
+  color: #d98080;
+}
+
+.report .sum td {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  font-weight: 700;
+  color: var(--warm);
+}
+
+.report .muted td {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.upgrades {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upgrade {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  text-align: left;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.upgrade:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.u-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.u-desc {
+  grid-column: 1;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.u-cost {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  font-size: 13px;
+  color: var(--warm);
+  font-variant-numeric: tabular-nums;
+}
+
+.primary {
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px;
+  border: none;
+  border-radius: 14px;
+  background: var(--warm);
+  color: #1a1206;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
