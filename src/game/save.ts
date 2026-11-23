@@ -10,6 +10,8 @@ export interface SaveData {
   upg: { mold: number; sign: number; heater: number; oden: number };
   /** 주민 id별 구매 횟수 */
   visits: Record<string, number>;
+  weather?: string;
+  tomorrow?: string;
 }
 
 export function load(): SaveData | null {

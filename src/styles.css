@@ -73,6 +73,34 @@ canvas {
   font-weight: 700;
 }
 
+.chip-weather {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  color: #a9c3e8;
+}
+
+.h2-sub {
+  font-size: 13px;
+  font-weight: 500;
+  color: #a9c3e8;
+  margin-left: 6px;
+}
+
+.forecast {
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.forecast strong {
+  color: #a9c3e8;
+}
+
 .book-btn {
   margin-left: auto;
   pointer-events: auto;
