@@ -1,3 +1,5 @@
+import type { Upgrades } from './config';
+
 /** localStorage 저장. 스키마가 바뀌면 version을 올리고 옛 저장은 버린다 */
 
 const KEY = 'unjungcheon-bunsik';
@@ -7,7 +9,7 @@ export interface SaveData {
   version: number;
   day: number;
   money: number;
-  upg: { mold: number; sign: number; heater: number; oden: number };
+  upg: Upgrades;
   /** 주민 id별 구매 횟수 */
   visits: Record<string, number>;
   weather?: string;

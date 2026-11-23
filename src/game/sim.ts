@@ -2,7 +2,7 @@
  * 게임 시뮬레이션. React와 Three.js에 의존하지 않는 순수 로직이다.
  * 렌더러는 매 프레임 이 객체의 값을 읽기만 한다.
  */
-import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind } from './config';
+import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind, type Upgrades } from './config';
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
@@ -49,6 +49,8 @@ export interface Mold {
   burnt: boolean;
   /** 다음 반죽까지 남은 시간. 틀이 전부 동시에 익으면 뒤집기가 한꺼번에 몰린다 */
   cooldown: number;
+  /** 알바가 이 반죽에 손을 댔는가. 한 번만 시도한다 */
+  helperTried: boolean;
 }
 
 export interface Unlock {
@@ -72,12 +74,7 @@ export interface DayReport {
   tomorrow: Weather;
 }
 
-export interface Upgrades {
-  mold: number;
-  sign: number;
-  heater: number;
-  oden: number;
-}
+export type { Upgrades } from './config';
 
 const SEP_RADIUS_SQ = 0.81;
 /** 말풍선 표시 시간(초) */
@@ -104,7 +101,7 @@ export class Sim {
   weather: Weather = rollWeather();
   tomorrow: Weather = rollWeather();
 
-  upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0 };
+  upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0, helper: 0 };
   /** shortfall: 손님이 원했지만 재고가 없어 못 준 개수. 날씨와 업그레이드 압력을 보여 주는 지표 */
   stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
 
@@ -153,7 +150,7 @@ export class Sim {
     storage.clear();
     this.day = 1;
     this.money = CONFIG.startMoney;
-    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0 };
+    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0, helper: 0 };
     this.visits = {};
     this.nextDay();
     this.day = 1;
@@ -177,6 +174,7 @@ export class Sim {
       burnt: false,
       // 틀마다 시작을 어긋나게 둬야 뒤집기가 한 번에 몰리지 않는다
       cooldown: i * (CONFIG.bake.time / this.moldCount),
+      helperTried: false,
     }));
   }
 
@@ -210,12 +208,14 @@ export class Sim {
           m.t = 0;
           m.flipped = false;
           m.burnt = false;
+          m.helperTried = false;
           this.money -= CONFIG.bake.cost;
           this.stats.cost += CONFIG.bake.cost;
         }
         continue;
       }
       m.t += dt;
+      this.tryHelperFlip(m);
       if (!m.flipped && m.t >= CONFIG.bake.flipWindow[1]) m.burnt = true;
       if (m.t >= CONFIG.bake.time) {
         this.tray.push({ burnt: m.burnt });
@@ -224,6 +224,20 @@ export class Sim {
         m.cooldown = rand(0.4, 1.6);
       }
     }
+  }
+
+  /**
+   * 알바의 자동 뒤집기.
+   * Lv1은 가끔 놓친다. 그래야 직접 뒤집는 쪽이 여전히 이득이고,
+   * 플레이어가 "구경만 해도 되는 상태"를 돈으로 사는 선택이 의미를 갖는다.
+   */
+  private tryHelperFlip(m: Mold) {
+    if (this.upg.helper === 0 || m.flipped || m.helperTried) return;
+    const [start, end] = CONFIG.bake.flipWindow;
+    const reactAt = Math.min(start + CONFIG.helperDelay, end - 0.3);
+    if (m.t < reactAt) return;
+    m.helperTried = true;
+    if (Math.random() < CONFIG.helperAccuracy[this.upg.helper]) m.flipped = true;
   }
 
   /** 뒤집기. 창 밖에서 눌러도 벌점은 없다 — 이 게임에 실패는 없다 */

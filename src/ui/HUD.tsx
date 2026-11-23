@@ -110,7 +110,7 @@ function Book({ onClose }: { onClose: () => void }) {
 function Settlement() {
   const snap = useSnapshot(6);
   const r = snap.report!;
-  const kinds: UpgradeKind[] = ['mold', 'sign', 'heater', 'oden'];
+  const kinds: UpgradeKind[] = ['mold', 'sign', 'heater', 'oden', 'helper'];
 
   return (
     <div className="overlay">
