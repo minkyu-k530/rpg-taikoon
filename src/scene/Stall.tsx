@@ -124,7 +124,100 @@ export function Stall() {
           <meshStandardMaterial color="#555" emissive="#ff4d1a" emissiveIntensity={0.5} roughness={0.6} />
         </mesh>
       )}
+
+      {/* 라디오 */}
+      {snap.upg.radio > 0 && (
+        <group position={[S.x + 1.5, 1.2, S.z + 0.5]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.3, 0.18, 0.14]} />
+            <meshStandardMaterial color="#6b5a44" roughness={0.8} />
+          </mesh>
+          <mesh position={[0, 0, -0.08]}>
+            <boxGeometry args={[0.16, 0.12, 0.01]} />
+            <meshStandardMaterial color="#2a2420" emissive="#ffb257" emissiveIntensity={0.3} />
+          </mesh>
+        </group>
+      )}
+
+      {/* 화분 */}
+      {snap.upg.planter > 0 &&
+        [-2.6, 2.6].map((dx) => (
+          <group key={dx} position={[S.x + dx, 0, S.z - 1.3]}>
+            <mesh position={[0, 0.17, 0]} castShadow>
+              <cylinderGeometry args={[0.24, 0.19, 0.34, 10]} />
+              <meshStandardMaterial color="#6b4a35" roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.46, 0]} castShadow>
+              <sphereGeometry args={[0.28, 8, 6]} />
+              <meshStandardMaterial color="#2a4030" roughness={1} />
+            </mesh>
+          </group>
+        ))}
+
+      {/* 테이블과 의자 */}
+      {snap.upg.table > 0 && (
+        <group position={[S.x - 3.4, 0, -2.1]}>
+          <mesh position={[0, 0.72, 0]} castShadow receiveShadow>
+            <boxGeometry args={[1.5, 0.07, 0.8]} />
+            <meshStandardMaterial color="#7d6244" roughness={0.9} />
+          </mesh>
+          {[-0.62, 0.62].map((dx) =>
+            [-0.3, 0.3].map((dz) => (
+              <mesh key={`${dx}:${dz}`} position={[dx, 0.35, dz]} castShadow>
+                <boxGeometry args={[0.06, 0.7, 0.06]} />
+                <meshStandardMaterial color="#4a3a2c" roughness={1} />
+              </mesh>
+            )),
+          )}
+          {[-1.05, 1.05].map((dx) => (
+            <mesh key={dx} position={[dx, 0.42, 0]} castShadow>
+              <boxGeometry args={[0.42, 0.08, 0.42]} />
+              <meshStandardMaterial color="#6b4a35" roughness={0.95} />
+            </mesh>
+          ))}
+        </group>
+      )}
+
+      {/* 전구 줄 — 마지막 겨울에 켜지는 불빛 */}
+      {snap.upg.lights > 0 && <StringLights />}
     </group>
+  );
+}
+
+/** 천막 앞을 가로지르는 전구 줄. 하나씩 조금씩 다르게 깜빡인다 */
+function StringLights() {
+  const bulbs = useMemo(
+    () => Array.from({ length: 11 }, (_, i) => ({ x: -1.9 + i * 0.38, phase: Math.random() * 6.3 })),
+    [],
+  );
+  const group = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const t = performance.now() * 0.001;
+    const children = group.current?.children ?? [];
+    for (let i = 0; i < children.length; i++) {
+      const mesh = children[i] as THREE.Mesh;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 1.1 + Math.sin(t * 1.4 + bulbs[i].phase) * 0.25;
+    }
+  });
+
+  return (
+    <>
+      <mesh position={[S.x, 2.14, S.z - 1.16]}>
+        <boxGeometry args={[4.1, 0.015, 0.015]} />
+        <meshStandardMaterial color="#2a2a2a" roughness={1} />
+      </mesh>
+      <group ref={group}>
+        {bulbs.map((b, i) => (
+          <mesh key={i} position={[S.x + b.x, 2.06, S.z - 1.16]}>
+            <sphereGeometry args={[0.045, 8, 6]} />
+            <meshStandardMaterial color="#ffd9a0" emissive="#ffb257" emissiveIntensity={1.1} />
+          </mesh>
+        ))}
+      </group>
+      <pointLight position={[S.x, 2.0, S.z - 1.2]} color="#ffc98a" intensity={9} distance={9} decay={2} />
+    </>
   );
 }
 

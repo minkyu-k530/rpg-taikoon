@@ -2,7 +2,16 @@
  * 게임 시뮬레이션. React와 Three.js에 의존하지 않는 순수 로직이다.
  * 렌더러는 매 프레임 이 객체의 값을 읽기만 한다.
  */
-import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind, type Upgrades } from './config';
+import {
+  CONFIG,
+  emptyUpgrades,
+  LAYOUT,
+  queueSlot,
+  rand,
+  upgradeCost,
+  type UpgradeKind,
+  type Upgrades,
+} from './config';
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
@@ -114,7 +123,7 @@ export class Sim {
   weather: Weather = rollWeather(SEASONS[CHAPTERS[0].season].weather);
   tomorrow: Weather = rollWeather(SEASONS[CHAPTERS[0].season].weather);
 
-  upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
+  upg: Upgrades = emptyUpgrades();
   /** shortfall: 손님이 원했지만 재고가 없어 못 준 개수. 날씨와 업그레이드 압력을 보여 주는 지표 */
   stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
 
@@ -342,10 +351,25 @@ export class Sim {
     return bonus;
   }
 
+  /** 꾸미기가 올려 주는 유입 */
+  private get decorSpawn() {
+    return this.upg.planter * 0.1 + this.upg.lights * 0.12;
+  }
+
+  /** 꾸미기가 올려 주는 체류 시간 배율 */
+  private get decorLinger() {
+    return 1 + this.upg.table * 0.35 + this.upg.lights * 0.12;
+  }
+
+  /** 꾸미기가 올려 주는 구매 확률(절대값 가산) */
+  private get decorBuy() {
+    return this.upg.radio * 0.03;
+  }
+
   private updateSpawn(dt: number) {
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
-    const rate = (1 + 0.3 * this.upg.sign + this.referralBonus) * WEATHER[this.weather].spawn;
+    const rate = (1 + 0.3 * this.upg.sign + this.referralBonus + this.decorSpawn) * WEATHER[this.weather].spawn;
     this.spawnTimer = (CONFIG.spawnInterval / rate) * rand(0.6, 1.4);
     if (this.villagers.length >= CONFIG.maxVillagers) return;
     const def = this.pickResident();
@@ -383,7 +407,7 @@ export class Sim {
     const stage = favorStage(visits);
     // 단골일수록 사러 올 확률이 높다. 관계가 수치로 돌아오는 유일한 지점
     const buyChance =
-      (CONFIG.buyChance + CONFIG.heaterBuyBonus * this.upg.heater + (def.name ? stage * 0.08 : 0)) *
+      (CONFIG.buyChance + CONFIG.heaterBuyBonus * this.upg.heater + this.decorBuy + (def.name ? stage * 0.08 : 0)) *
       WEATHER[this.weather].buy;
     const intent: Intent =
       roll < buyChance ? 'buy' : roll < buyChance + CONFIG.browseChance ? 'browse' : 'pass';
@@ -537,9 +561,15 @@ export class Sim {
           if (q >= 0) this.queue.splice(q, 1);
           v.phase = 'eat';
           v.carrying = true;
-          v.timer = rand(5, 9) * WEATHER[this.weather].linger;
-          v.spotX = LAYOUT.stall.x + rand(-5, 3);
-          v.spotZ = rand(-3.4, -2.6);
+          v.timer = rand(5, 9) * WEATHER[this.weather].linger * this.decorLinger;
+          if (this.upg.table > 0) {
+            // 테이블이 있으면 앉아서 먹는다. 가게 앞이 북적여 보인다
+            v.spotX = LAYOUT.stall.x - 3.4 + rand(-0.5, 0.5);
+            v.spotZ = -2.1 + rand(-0.3, 0.3);
+          } else {
+            v.spotX = LAYOUT.stall.x + rand(-5, 3);
+            v.spotZ = rand(-3.4, -2.6);
+          }
         } else {
           // 재고가 없다. 기다려 주다가 조용히 떠난다 (호감도 변화 없음)
           v.patience -= dt;
@@ -701,7 +731,7 @@ export class Sim {
   newRun() {
     this.day = 1;
     this.money = CONFIG.startMoney;
-    this.upg = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
+    this.upg = emptyUpgrades();
     this.totalProfit = 0;
     this.ending = null;
     this.choosingEnding = false;
