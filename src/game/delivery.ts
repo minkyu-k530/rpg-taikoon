@@ -17,6 +17,8 @@ export interface Obstacle {
   /** 충돌 반경 */
   r: number;
   hit: boolean;
+  /** 이미 지나친 장애물. 콤보를 두 번 세지 않는다 */
+  passed: boolean;
 }
 
 export interface ObstacleDef {
@@ -84,6 +86,13 @@ export class Delivery {
   lost = 0;
   /** 마지막으로 맞은 장애물. 화면에 잠깐 띄운다 */
   lastHit: { kind: ObstacleKind; at: number } | null = null;
+
+  /**
+   * 연속으로 피한 장애물 수. 맞으면 0으로 돌아간다.
+   * 도착할 때 최고 기록만큼 보너스를 준다 — 조심히 달릴 이유를 만든다
+   */
+  combo = 0;
+  bestCombo = 0;
 
   obstacles: Obstacle[] = [];
   done = false;
@@ -158,14 +167,23 @@ export class Delivery {
   }
 
   private checkHits() {
-    if (this.grace > 0) return;
     for (const o of this.obstacles) {
-      if (o.hit) continue;
+      if (o.hit || o.passed) continue;
+      // 지나쳤으면 피한 것이다
+      if (o.x < this.distance - 0.8) {
+        o.passed = true;
+        this.combo++;
+        if (this.combo > this.bestCombo) this.bestCombo = this.combo;
+        continue;
+      }
+      if (this.grace > 0) continue;
       if (Math.abs(o.x - this.distance) > 0.7) continue;
       if (Math.abs(o.z - this.z) > o.r) continue;
       // 물웅덩이는 뛰어넘을 수 있다
       if (OBSTACLES[o.kind].jumpable && this.height > 0.35) continue;
       o.hit = true;
+      o.passed = true;
+      this.combo = 0;
       this.grace = COURSE.graceTime;
       this.stumble = COURSE.stumbleTime;
       const loss = Math.min(this.left, OBSTACLES[o.kind].loss);
@@ -200,7 +218,7 @@ function makeCourse(total: number): Obstacle[] {
     const r = kind === 'puddle' ? 1.3 : kind === 'bench' ? 1.0 : 0.85;
     // 피할 자리는 반드시 남긴다. 양쪽 끝을 다 막지 않는다
     const z = (Math.random() * 2 - 1) * (COURSE.halfWidth - r * 0.5);
-    out.push({ id: id++, kind, x, z, r, hit: false });
+    out.push({ id: id++, kind, x, z, r, hit: false, passed: false });
   }
   return out;
 }
