@@ -101,6 +101,11 @@ canvas {
   color: #a9c3e8;
 }
 
+.upgrade.danger {
+  border-color: rgba(217, 128, 128, 0.5);
+  color: #e8a0a0;
+}
+
 .icon-btn {
   margin-left: auto;
   pointer-events: auto;
