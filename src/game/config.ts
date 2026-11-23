@@ -82,6 +82,12 @@ export const CONFIG = {
     oden: { label: '어묵탕', base: 25000, mult: 1, max: 1, unlockDay: 7, desc: '조작 없이 팔리는 메뉴 해금' },
     tteok: { label: '떡볶이 솥', base: 60000, mult: 1, max: 1, unlockDay: 19, desc: '4,000원짜리 메뉴 해금' },
     helper: { label: '알바', base: 45000, mult: 2.4, max: 2, unlockDay: 38, desc: '뒤집기를 대신해 준다' },
+    // 후반 축. 38일이면 위의 것들이 전부 끝나 4·5장이 비어 버린다.
+    // 가게가 '커지는' 게 아니라 '갖춰지는' 축이라 잔잔함을 깨지 않는다
+    radio: { label: '라디오', base: 80000, mult: 1, max: 1, unlockDay: 25, desc: '사 먹을 확률 +3%p' },
+    planter: { label: '화분', base: 150000, mult: 1, max: 1, unlockDay: 35, desc: '지나가는 사람 +10%' },
+    table: { label: '테이블과 의자', base: 400000, mult: 1, max: 1, unlockDay: 46, desc: '앉아서 먹고 간다 · 체류 +35%' },
+    lights: { label: '전구 줄', base: 700000, mult: 1, max: 1, unlockDay: 60, desc: '유입 +12% · 체류 +12%' },
   },
   /** 시작 틀 개수 */
   baseMolds: 2,
@@ -98,6 +104,13 @@ export type UpgradeKind = keyof typeof CONFIG.upgrades;
 
 /** 업그레이드 종류별 레벨. 세 모듈이 각자 모양을 베껴 쓰지 않도록 여기서 한 번만 정의한다 */
 export type Upgrades = Record<UpgradeKind, number>;
+
+/** 모든 종류가 0인 업그레이드. 종류를 추가해도 여기만 고치면 된다 */
+export function emptyUpgrades(): Upgrades {
+  const out = {} as Upgrades;
+  for (const k of Object.keys(CONFIG.upgrades) as UpgradeKind[]) out[k] = 0;
+  return out;
+}
 
 export function upgradeCost(kind: UpgradeKind, level: number) {
   const u = CONFIG.upgrades[kind];
