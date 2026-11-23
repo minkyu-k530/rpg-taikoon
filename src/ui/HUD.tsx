@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
 import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
+import { WEATHER } from '../game/weather';
 import { sim, useSnapshot } from '../game/useSim';
 
 const won = (n: number) => n.toLocaleString('ko-KR') + '원';
@@ -18,6 +19,7 @@ export function HUD() {
         <div className="chip">
           <span className="chip-label">{snap.day}일차</span>
           <span className="chip-time">{Math.ceil(snap.timeLeft)}초</span>
+          <span className="chip-weather">{WEATHER[snap.weather].label}</span>
         </div>
         <div className="chip money">{won(snap.money)}</div>
         <button className="chip book-btn" onClick={() => setBookOpen(true)}>
@@ -26,7 +28,7 @@ export function HUD() {
       </div>
 
       <div className="hud-sub">
-        진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리 {snap.crowd}명
+        진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리 {snap.crowd}명 · {WEATHER[snap.weather].note}
       </div>
 
       <div className="hud-bottom">
@@ -113,7 +115,9 @@ function Settlement() {
   return (
     <div className="overlay">
       <div className="sheet">
-        <h2>{r.day}일차 마감</h2>
+        <h2>
+          {r.day}일차 마감 <span className="h2-sub">{WEATHER[r.weather].label}</span>
+        </h2>
         <table className="report">
           <tbody>
             <tr>
@@ -136,9 +140,15 @@ function Settlement() {
               <td>순이익</td>
               <td>{won(r.profit)}</td>
             </tr>
+            {r.shortfall > 0 && (
+              <tr className="muted">
+                <td>재고가 없어 못 판 개수</td>
+                <td>{r.shortfall}개</td>
+              </tr>
+            )}
             {r.missed > 0 && (
               <tr className="muted">
-                <td>못 판 손님</td>
+                <td>그냥 돌아간 손님</td>
                 <td>{r.missed}명</td>
               </tr>
             )}
@@ -175,6 +185,9 @@ function Settlement() {
           })}
         </div>
 
+        <p className="forecast">
+          내일은 <strong>{WEATHER[r.tomorrow].label}</strong> — {WEATHER[r.tomorrow].note}
+        </p>
         <button className="primary" onClick={() => sim.nextDay()}>
           다음 날 시작
         </button>

@@ -5,6 +5,7 @@
 import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind } from './config';
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
+import { rollWeather, WEATHER, type Weather } from './weather';
 
 export type Phase = 'walk' | 'browse' | 'queue' | 'serve' | 'eat' | 'leave';
 export type Intent = 'pass' | 'browse' | 'buy';
@@ -65,7 +66,10 @@ export interface DayReport {
   cost: number;
   profit: number;
   missed: number;
+  shortfall: number;
   unlocks: Unlock[];
+  weather: Weather;
+  tomorrow: Weather;
 }
 
 export interface Upgrades {
@@ -79,6 +83,11 @@ const SEP_RADIUS_SQ = 0.81;
 /** 말풍선 표시 시간(초) */
 const SPEECH_TIME = 4.5;
 
+/** 저장된 문자열을 날씨로 좁힌다. 손상된 값이 들어와도 기본값으로 떨어진다 */
+function isWeather(v: string | undefined): v is Weather {
+  return v === 'clear' || v === 'snow' || v === 'rain';
+}
+
 export class Sim {
   villagers: Villager[] = [];
   queue: Villager[] = [];
@@ -91,8 +100,13 @@ export class Sim {
   open = true;
   report: DayReport | null = null;
 
+  /** 오늘 날씨. 내일 날씨는 마감 때 미리 보여 준다 */
+  weather: Weather = rollWeather();
+  tomorrow: Weather = rollWeather();
+
   upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0 };
-  stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0 };
+  /** shortfall: 손님이 원했지만 재고가 없어 못 준 개수. 날씨와 업그레이드 압력을 보여 주는 지표 */
+  stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
 
   /** 주민 id별 누적 구매 횟수. 이 숫자가 단골 관계의 전부다 */
   visits: Record<string, number> = {};
@@ -119,11 +133,20 @@ export class Sim {
     this.money = data.money;
     this.upg = { ...this.upg, ...data.upg };
     this.visits = { ...data.visits };
+    if (isWeather(data.weather)) this.weather = data.weather;
+    if (isWeather(data.tomorrow)) this.tomorrow = data.tomorrow;
     this.resetMolds();
   }
 
   persist() {
-    storage.save({ day: this.day, money: this.money, upg: this.upg, visits: this.visits });
+    storage.save({
+      day: this.day,
+      money: this.money,
+      upg: this.upg,
+      visits: this.visits,
+      weather: this.weather,
+      tomorrow: this.tomorrow,
+    });
   }
 
   resetProgress() {
@@ -227,7 +250,7 @@ export class Sim {
   private updateSpawn(dt: number) {
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
-    const rate = 1 + 0.3 * this.upg.sign + this.referralBonus;
+    const rate = (1 + 0.3 * this.upg.sign + this.referralBonus) * WEATHER[this.weather].spawn;
     this.spawnTimer = (CONFIG.spawnInterval / rate) * rand(0.6, 1.4);
     if (this.villagers.length >= CONFIG.maxVillagers) return;
     const def = this.pickResident();
@@ -258,7 +281,8 @@ export class Sim {
     const stage = favorStage(visits);
     // 단골일수록 사러 올 확률이 높다. 관계가 수치로 돌아오는 유일한 지점
     const buyChance =
-      CONFIG.buyChance + CONFIG.heaterBuyBonus * this.upg.heater + (def.name ? stage * 0.08 : 0);
+      (CONFIG.buyChance + CONFIG.heaterBuyBonus * this.upg.heater + (def.name ? stage * 0.08 : 0)) *
+      WEATHER[this.weather].buy;
     const intent: Intent =
       roll < buyChance ? 'buy' : roll < buyChance + CONFIG.browseChance ? 'browse' : 'pass';
     const menu: Menu =
@@ -412,7 +436,7 @@ export class Sim {
           if (q >= 0) this.queue.splice(q, 1);
           v.phase = 'eat';
           v.carrying = true;
-          v.timer = rand(5, 9);
+          v.timer = rand(5, 9) * WEATHER[this.weather].linger;
           v.spotX = LAYOUT.stall.x + rand(-5, 3);
           v.spotZ = rand(-3.4, -2.6);
         } else {
@@ -420,6 +444,7 @@ export class Sim {
           v.patience -= dt;
           if (v.patience <= 0) {
             this.stats.missed++;
+            this.stats.shortfall += v.qty;
             const q = this.queue.indexOf(v);
             if (q >= 0) this.queue.splice(q, 1);
             v.phase = 'leave';
@@ -464,6 +489,7 @@ export class Sim {
     } else {
       if (this.tray.length === 0) return false;
       n = Math.min(v.qty, this.tray.length);
+      this.stats.shortfall += v.qty - n;
       for (let i = 0; i < n; i++) {
         const item = this.tray.shift()!;
         revenue += item.burnt ? CONFIG.bake.burntPrice : CONFIG.bake.price;
@@ -519,17 +545,22 @@ export class Sim {
       cost: this.stats.cost,
       profit: this.stats.revenue - this.stats.cost,
       missed: this.stats.missed,
+      shortfall: this.stats.shortfall,
       unlocks: this.todayUnlocks,
+      weather: this.weather,
+      tomorrow: this.tomorrow,
     };
     this.persist();
   }
 
   nextDay() {
     this.day++;
+    this.weather = this.tomorrow;
+    this.tomorrow = rollWeather();
     this.dayTime = 0;
     this.open = true;
     this.report = null;
-    this.stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0 };
+    this.stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
     this.todayUnlocks = [];
     this.villagers = [];
     this.queue = [];

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Environment } from './scene/Environment';
+import { Weather } from './scene/Weather';
 import { Stall } from './scene/Stall';
 import { Crowd } from './scene/Crowd';
 import { HUD } from './ui/HUD';
@@ -24,6 +25,7 @@ export default function App() {
         <Environment />
         <Stall />
         <Crowd />
+        <Weather />
       </Canvas>
       <HUD />
     </div>

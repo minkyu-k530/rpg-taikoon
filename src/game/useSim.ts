@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CONFIG } from './config';
 import type { Look } from './residents';
+import type { Weather } from './weather';
 import { Sim } from './sim';
 
 /** 시뮬레이션 인스턴스는 하나. 렌더러는 이걸 읽기만 한다 */
@@ -24,6 +25,7 @@ export interface Snapshot {
   molds: { baking: boolean; t: number; flipped: boolean; burnt: boolean }[];
   upg: { mold: number; sign: number; heater: number; oden: number };
   visits: Record<string, number>;
+  weather: Weather;
   report: Sim['report'];
 }
 
@@ -53,6 +55,7 @@ function read(): Snapshot {
     molds: sim.molds.map((m) => ({ baking: m.baking, t: m.t, flipped: m.flipped, burnt: m.burnt })),
     upg: { ...sim.upg },
     visits: { ...sim.visits },
+    weather: sim.weather,
     report: sim.report,
   };
 }
