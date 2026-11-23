@@ -101,8 +101,17 @@ canvas {
   color: #a9c3e8;
 }
 
-.book-btn {
+.icon-btn {
   margin-left: auto;
+  pointer-events: auto;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.book-btn {
+  margin-left: 8px;
   pointer-events: auto;
   color: var(--fg);
   font-family: inherit;
