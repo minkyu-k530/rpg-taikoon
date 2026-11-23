@@ -19,22 +19,21 @@ export interface WeatherDef {
   linger: number;
   /** 한 줄 설명. 마감 화면 예보에 쓴다 */
   note: string;
-  /** 추첨 가중치 */
-  weight: number;
 }
 
 export const WEATHER: Record<Weather, WeatherDef> = {
-  clear: { id: 'clear', label: '맑음', spawn: 1, buy: 1, linger: 1, note: '평범한 저녁', weight: 5 },
-  snow: { id: 'snow', label: '눈', spawn: 0.95, buy: 1.5, linger: 1.2, note: '붕어빵이 잘 팔린다', weight: 3 },
-  rain: { id: 'rain', label: '비', spawn: 0.82, buy: 1.3, linger: 1.4, note: '사람은 적지만 오래 머문다', weight: 2 },
+  clear: { id: 'clear', label: '맑음', spawn: 1, buy: 1, linger: 1, note: '평범한 저녁' },
+  snow: { id: 'snow', label: '눈', spawn: 0.95, buy: 1.5, linger: 1.2, note: '붕어빵이 잘 팔린다' },
+  rain: { id: 'rain', label: '비', spawn: 0.82, buy: 1.3, linger: 1.4, note: '사람은 적지만 오래 머문다' },
 };
 
-export function rollWeather(): Weather {
+/** 계절마다 날씨 확률이 다르다. 3장 장마에 비가 잦은 건 연출이 아니라 서사다 */
+export function rollWeather(weights: Record<Weather, number>): Weather {
   const list = Object.values(WEATHER);
-  const total = list.reduce((s, w) => s + w.weight, 0);
+  const total = list.reduce((s, w) => s + weights[w.id], 0);
   let roll = Math.random() * total;
   for (const w of list) {
-    roll -= w.weight;
+    roll -= weights[w.id];
     if (roll <= 0) return w.id;
   }
   return 'clear';

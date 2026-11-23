@@ -1,20 +1,25 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { LAYOUT } from '../game/config';
+import { SEASONS } from '../game/season';
+import { useSnapshot } from '../game/useSim';
 
 /**
  * 판교 운중천 산책로. 회색 박스 단계라 전부 기본 도형이지만
  * 조명·안개·건너편 불빛은 지금 잡아 둔다. 잔잔함은 여기서 절반이 나온다.
+ *
+ * 계절이 바뀌면 같은 도형에 색만 갈아 끼운다. 새로 만드는 에셋은 없다.
  */
 export function Environment() {
+  const season = SEASONS[useSnapshot(2).season];
   return (
     <>
       {/* 밤이지만 읽혀야 한다. 안개는 멀리 밀고, 하늘빛을 올려 실루엣을 살린다 */}
-      <fog attach="fog" args={['#141d2b', 24, 95]} />
-      <color attach="background" args={['#0e141f']} />
+      <fog attach="fog" args={[season.fog, 24, 95]} />
+      <color attach="background" args={[season.background]} />
 
       {/* 달빛 */}
-      <hemisphereLight args={['#44618f', '#161d18', 1.1]} />
+      <hemisphereLight args={[season.sky, season.ground, 1.1]} />
       <directionalLight
         position={[-14, 16, -10]}
         intensity={0.8}
@@ -29,18 +34,18 @@ export function Environment() {
         shadow-camera-far={60}
       />
 
-      <Ground />
+      <Ground grass={season.grass} />
       <River />
       <Railing />
       <Lamps />
-      <Trees />
-      <Foreground />
+      <Trees foliage={season.foliage} />
+      <Foreground foliage={season.foliage} />
       <FarBuildings />
     </>
   );
 }
 
-function Ground() {
+function Ground({ grass }: { grass: string }) {
   return (
     <group>
       {/* 산책로 */}
@@ -56,7 +61,7 @@ function Ground() {
       {/* 카메라 앞쪽 잔디 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -9]} receiveShadow>
         <planeGeometry args={[70, 8]} />
-        <meshStandardMaterial color="#20291f" roughness={1} />
+        <meshStandardMaterial color={grass} roughness={1} />
       </mesh>
     </group>
   );
@@ -143,7 +148,7 @@ function Lamps() {
  * 카메라 바로 앞 소품. 비어 있던 전경을 채워 화면에 깊이를 만든다.
  * 산책로 건너편(관찰자 쪽) 벤치와 덤불이라는 설정.
  */
-function Foreground() {
+function Foreground({ foliage }: { foliage: string }) {
   const bushes = useMemo(
     () =>
       Array.from({ length: 14 }, (_, i) => ({
@@ -181,14 +186,14 @@ function Foreground() {
       {bushes.map((b, i) => (
         <mesh key={i} position={[b.x, b.r * 0.7, b.z]} castShadow>
           <sphereGeometry args={[b.r, 7, 5]} />
-          <meshStandardMaterial color="#1b2a1d" roughness={1} />
+          <meshStandardMaterial color={foliage} roughness={1} />
         </mesh>
       ))}
     </group>
   );
 }
 
-function Trees() {
+function Trees({ foliage }: { foliage: string }) {
   const trees = useMemo(() => {
     const out: { x: number; z: number; h: number; r: number }[] = [];
     for (let i = 0; i < 16; i++) {
@@ -209,7 +214,7 @@ function Trees() {
           </mesh>
           <mesh position={[0, t.h + t.r * 0.5, 0]} castShadow>
             <sphereGeometry args={[t.r, 8, 6]} />
-            <meshStandardMaterial color="#1d2a1f" roughness={1} />
+            <meshStandardMaterial color={foliage} roughness={1} />
           </mesh>
         </group>
       ))}

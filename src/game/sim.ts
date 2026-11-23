@@ -6,7 +6,8 @@ import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind, type Up
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
-import { chapterForDay, SCENE_BY_DAY, type Chapter, type Scene } from './story';
+import { chapterForDay, CHAPTERS, SCENE_BY_DAY, type Chapter, type Scene } from './story';
+import { SEASONS } from './season';
 import type { SimEvent } from './audio';
 
 export type Phase = 'walk' | 'browse' | 'queue' | 'serve' | 'eat' | 'leave';
@@ -100,8 +101,8 @@ export class Sim {
   report: DayReport | null = null;
 
   /** 오늘 날씨. 내일 날씨는 마감 때 미리 보여 준다 */
-  weather: Weather = rollWeather();
-  tomorrow: Weather = rollWeather();
+  weather: Weather = rollWeather(SEASONS[CHAPTERS[0].season].weather);
+  tomorrow: Weather = rollWeather(SEASONS[CHAPTERS[0].season].weather);
 
   upg: Upgrades = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
   /** shortfall: 손님이 원했지만 재고가 없어 못 준 개수. 날씨와 업그레이드 압력을 보여 주는 지표 */
@@ -655,7 +656,8 @@ export class Sim {
   nextDay() {
     this.day++;
     this.weather = this.tomorrow;
-    this.tomorrow = rollWeather();
+    // 내일 날씨는 내일이 속한 계절로 뽑는다. 장이 넘어가는 날 계절이 바뀐다
+    this.tomorrow = rollWeather(SEASONS[chapterForDay(this.day + 1).season].weather);
     this.dayTime = 0;
     this.open = true;
     this.report = null;
