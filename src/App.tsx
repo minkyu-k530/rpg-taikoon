@@ -7,8 +7,21 @@ import { Stall } from './scene/Stall';
 import { Crowd } from './scene/Crowd';
 import { HUD } from './ui/HUD';
 import { sim } from './game/useSim';
+import { audio } from './game/audio';
 
 export default function App() {
+  // 브라우저는 첫 입력 전에는 소리를 막는다. 어디를 누르든 그때 오디오를 깨운다
+  useEffect(() => {
+    sim.onEvent = (e) => audio.play(e);
+    const wake = () => audio.start();
+    window.addEventListener('pointerdown', wake);
+    window.addEventListener('keydown', wake);
+    return () => {
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('keydown', wake);
+    };
+  }, []);
+
   return (
     <div className="app">
       <Canvas
@@ -33,7 +46,11 @@ export default function App() {
 }
 
 function Ticker() {
-  useFrame((_, delta) => sim.tick(delta));
+  useFrame((_, delta) => {
+    sim.tick(delta);
+    const baking = sim.molds.filter((m) => m.baking).length / Math.max(1, sim.molds.length);
+    audio.update(sim.weather, baking);
+  });
   return null;
 }
 

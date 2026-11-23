@@ -6,6 +6,7 @@ import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind, type Up
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
+import type { SimEvent } from './audio';
 
 export type Phase = 'walk' | 'browse' | 'queue' | 'serve' | 'eat' | 'leave';
 export type Intent = 'pass' | 'browse' | 'buy';
@@ -112,6 +113,16 @@ export class Sim {
 
   /** 시작 후 누적 시간(초). 말풍선 타이머에 쓴다 */
   clock = 0;
+
+  /**
+   * 일어난 일을 바깥에 알린다. 지금은 소리만 듣고 있다.
+   * 시뮬레이션이 오디오를 import 해서 직접 울리면 테스트에서 분리가 안 된다
+   */
+  onEvent: ((e: SimEvent) => void) | null = null;
+
+  private emit(e: SimEvent) {
+    this.onEvent?.(e);
+  }
 
   private nextId = 1;
   private spawnTimer = 0;
@@ -237,7 +248,10 @@ export class Sim {
     const reactAt = Math.min(start + CONFIG.helperDelay, end - 0.3);
     if (m.t < reactAt) return;
     m.helperTried = true;
-    if (Math.random() < CONFIG.helperAccuracy[this.upg.helper]) m.flipped = true;
+    if (Math.random() < CONFIG.helperAccuracy[this.upg.helper]) {
+      m.flipped = true;
+      this.emit('flip');
+    }
   }
 
   /** 뒤집기. 창 밖에서 눌러도 벌점은 없다 — 이 게임에 실패는 없다 */
@@ -247,6 +261,7 @@ export class Sim {
     const [a, b] = CONFIG.bake.flipWindow;
     if (m.t < a || m.t >= b) return false;
     m.flipped = true;
+    this.emit('flip');
     return true;
   }
 
@@ -514,6 +529,7 @@ export class Sim {
     this.stats.revenue += revenue;
     this.stats.sold += n;
     this.stats.customers++;
+    this.emit('sale');
     this.recordVisit(v);
     return true;
   }
@@ -537,6 +553,7 @@ export class Sim {
         stageLabel: ['모르는 사람', '눈에 익음', '단골', '아는 사이', '가족 같은'][stage],
       };
       this.todayUnlocks.push(unlock);
+      this.emit('unlock');
       v.name = def.name;
     }
 
@@ -551,6 +568,7 @@ export class Sim {
 
   private closeDay() {
     this.open = false;
+    this.emit('dayEnd');
     this.report = {
       day: this.day,
       customers: this.stats.customers,

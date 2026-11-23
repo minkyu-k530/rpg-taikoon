@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { audio } from '../game/audio';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
 import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
 import { WEATHER } from '../game/weather';
@@ -9,6 +10,7 @@ const won = (n: number) => n.toLocaleString('ko-KR') + '원';
 export function HUD() {
   const snap = useSnapshot();
   const [bookOpen, setBookOpen] = useState(false);
+  const [muted, setMuted] = useState(audio.muted);
   const [flipA, flipB] = CONFIG.bake.flipWindow;
 
   const known = REGULARS.filter((r) => (snap.visits[r.id] ?? 0) >= FAVOR_STAGES[1].visits).length;
@@ -22,6 +24,16 @@ export function HUD() {
           <span className="chip-weather">{WEATHER[snap.weather].label}</span>
         </div>
         <div className="chip money">{won(snap.money)}</div>
+        <button
+          className="chip icon-btn"
+          onClick={() => {
+            audio.start();
+            audio.setMuted(!muted);
+            setMuted(!muted);
+          }}
+        >
+          {muted ? '소리 꺼짐' : '소리 켜짐'}
+        </button>
         <button className="chip book-btn" onClick={() => setBookOpen(true)}>
           단골 {known}/{REGULARS.length}
         </button>
