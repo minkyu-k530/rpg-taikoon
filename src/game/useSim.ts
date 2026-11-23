@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CONFIG } from './config';
+import { CONFIG, type Upgrades } from './config';
 import type { Look } from './residents';
 import type { Weather } from './weather';
 import { Sim } from './sim';
@@ -23,7 +23,7 @@ export interface Snapshot {
   queue: number;
   crowd: number;
   molds: { baking: boolean; t: number; flipped: boolean; burnt: boolean }[];
-  upg: { mold: number; sign: number; heater: number; oden: number };
+  upg: Upgrades;
   visits: Record<string, number>;
   weather: Weather;
   report: Sim['report'];

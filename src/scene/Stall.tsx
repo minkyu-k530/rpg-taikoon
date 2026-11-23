@@ -24,6 +24,10 @@ export function Stall() {
 
   return (
     <group>
+      {/* 가게를 지키는 사람. 비어 있는 노점은 아무리 예뻐도 죽은 화면이다 */}
+      <Keeper x={S.x - 0.5} color="#4a5c6e" skin="#dcae87" />
+      {snap.upg.helper > 0 && <Keeper x={S.x + 1.0} color="#6b4a2f" skin="#e8c3a0" offset={1.7} />}
+
       {/* 몸체 */}
       <mesh position={[S.x, 0.52, S.z]} castShadow receiveShadow>
         <boxGeometry args={[3.2, 1.04, 1.5]} />
@@ -117,6 +121,62 @@ export function Stall() {
           <meshStandardMaterial color="#555" emissive="#ff4d1a" emissiveIntensity={0.5} roughness={0.6} />
         </mesh>
       )}
+    </group>
+  );
+}
+
+/**
+ * 카운터 뒤에 선 사람. 굽는 틀이 있으면 팔을 움직이고, 없으면 가볍게 흔들린다.
+ * 손님 모델과 달리 걷지 않으므로 여기서 따로 그린다.
+ */
+function Keeper({ x, color, skin, offset = 0 }: { x: number; color: string; skin: string; offset?: number }) {
+  const arm = useRef<THREE.Group>(null);
+  const body = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const t = performance.now() * 0.001 + offset;
+    const working = sim.molds.some((m) => m.baking);
+    if (arm.current) {
+      // 굽는 중에는 손을 놀리고, 아니면 거의 멈춰 있다
+      arm.current.rotation.x = working ? Math.sin(t * 3.4) * 0.5 - 0.3 : Math.sin(t * 0.8) * 0.06;
+    }
+    if (body.current) body.current.position.y = Math.sin(t * 0.9) * 0.012;
+  });
+
+  return (
+    <group ref={body} position={[x, 0, S.z + 0.45]} rotation={[0, Math.PI, 0]}>
+      <mesh position={[0, 0.46, 0]} castShadow>
+        <boxGeometry args={[0.34, 0.92, 0.2]} />
+        <meshStandardMaterial color="#2e3b4e" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 1.08, 0]} castShadow>
+        <boxGeometry args={[0.42, 0.5, 0.26]} />
+        <meshStandardMaterial color={color} roughness={0.85} />
+      </mesh>
+      {/* 앞치마 */}
+      <mesh position={[0, 0.78, -0.15]}>
+        <boxGeometry args={[0.36, 0.5, 0.03]} />
+        <meshStandardMaterial color="#d8d2c4" roughness={1} />
+      </mesh>
+      <group ref={arm} position={[-0.26, 1.28, 0]}>
+        <mesh position={[0, -0.2, -0.04]} castShadow>
+          <boxGeometry args={[0.1, 0.46, 0.12]} />
+          <meshStandardMaterial color={color} roughness={0.85} />
+        </mesh>
+      </group>
+      <mesh position={[0.26, 1.08, 0]} castShadow>
+        <boxGeometry args={[0.1, 0.46, 0.12]} />
+        <meshStandardMaterial color={color} roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 1.46, 0]} castShadow>
+        <sphereGeometry args={[0.13, 12, 10]} />
+        <meshStandardMaterial color={skin} roughness={0.8} />
+      </mesh>
+      {/* 두건 */}
+      <mesh position={[0, 1.5, 0]} castShadow>
+        <sphereGeometry args={[0.138, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#c2552f" roughness={1} />
+      </mesh>
     </group>
   );
 }

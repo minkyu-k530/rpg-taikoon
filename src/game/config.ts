@@ -69,12 +69,23 @@ export const CONFIG = {
     sign: { label: '간판', base: 15000, mult: 2.2, max: 3, desc: '지나가는 사람 +30%' },
     heater: { label: '온풍기', base: 12000, mult: 2.0, max: 3, desc: '사 먹을 확률 +5%p' },
     oden: { label: '어묵탕', base: 25000, mult: 1, max: 1, desc: '조작 없이 팔리는 메뉴 해금' },
+    helper: { label: '알바', base: 45000, mult: 2.4, max: 2, desc: '뒤집기를 대신해 준다' },
   },
   /** 시작 틀 개수 */
   baseMolds: 2,
+  /**
+   * 알바의 뒤집기 성공률. Lv1은 가끔 놓쳐서 직접 하는 쪽이 여전히 이득이고,
+   * Lv2는 완벽해서 플레이어가 손을 놓고 구경만 해도 된다 (GDD 4장 3번)
+   */
+  helperAccuracy: [0, 0.8, 1] as const,
+  /** 알바가 뒤집기 창이 열린 뒤 반응하는 데 걸리는 시간(초) */
+  helperDelay: 1.4,
 } as const;
 
 export type UpgradeKind = keyof typeof CONFIG.upgrades;
+
+/** 업그레이드 종류별 레벨. 세 모듈이 각자 모양을 베껴 쓰지 않도록 여기서 한 번만 정의한다 */
+export type Upgrades = Record<UpgradeKind, number>;
 
 export function upgradeCost(kind: UpgradeKind, level: number) {
   const u = CONFIG.upgrades[kind];
