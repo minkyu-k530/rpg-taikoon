@@ -384,6 +384,79 @@ canvas {
   right: 0;
 }
 
+/* 손님의 부탁. 화면을 막지 않는다 */
+.offer {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 126px);
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 28px));
+  padding: 14px 16px 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(16, 20, 28, 0.94);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+
+.offer.special {
+  border-color: rgba(255, 178, 87, 0.55);
+}
+
+.offer-who {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a9c3e8;
+}
+
+.offer-line {
+  margin: 6px 0 12px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.offer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.offer-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.offer-no {
+  background: transparent;
+  color: var(--muted);
+}
+
+.offer-yes {
+  background: var(--warm);
+  border-color: var(--warm);
+  color: #1a1206;
+  font-weight: 700;
+}
+
+.offer-yes:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.offer-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--warm);
+  opacity: 0.5;
+  transition: width 0.12s linear;
+}
+
 .icon-btn {
   margin-left: auto;
   pointer-events: auto;
