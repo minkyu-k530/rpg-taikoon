@@ -73,10 +73,99 @@ canvas {
   font-weight: 700;
 }
 
-.chip.small {
+.book-btn {
   margin-left: auto;
+  pointer-events: auto;
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.hud-sub {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 50px);
+  left: 14px;
   font-size: 12px;
   color: var(--muted);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- 단골 도감 */
+
+.book {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.card.locked {
+  display: flex;
+  justify-content: space-between;
+  opacity: 0.35;
+  font-size: 13px;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.card-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.card-stage {
+  font-size: 12px;
+  color: var(--warm);
+}
+
+.card-blurb {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card-line {
+  margin: 3px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.card-episode {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #d8c7a8;
+}
+
+.card-progress {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.unlocks {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 178, 87, 0.12);
+  border: 1px solid rgba(255, 178, 87, 0.3);
+}
+
+.unlocks p {
+  margin: 3px 0;
+  font-size: 13px;
 }
 
 /* ---------------------------------------------------------------- 하단 */

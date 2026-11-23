@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
+import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
 import { sim, useSnapshot } from '../game/useSim';
 
 const won = (n: number) => n.toLocaleString('ko-KR') + '원';
 
 export function HUD() {
   const snap = useSnapshot();
+  const [bookOpen, setBookOpen] = useState(false);
   const [flipA, flipB] = CONFIG.bake.flipWindow;
+
+  const known = REGULARS.filter((r) => (snap.visits[r.id] ?? 0) >= FAVOR_STAGES[1].visits).length;
 
   return (
     <>
@@ -15,9 +20,13 @@ export function HUD() {
           <span className="chip-time">{Math.ceil(snap.timeLeft)}초</span>
         </div>
         <div className="chip money">{won(snap.money)}</div>
-        <div className="chip small">
-          진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리 {snap.crowd}명
-        </div>
+        <button className="chip book-btn" onClick={() => setBookOpen(true)}>
+          단골 {known}/{REGULARS.length}
+        </button>
+      </div>
+
+      <div className="hud-sub">
+        진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리 {snap.crowd}명
       </div>
 
       <div className="hud-bottom">
@@ -42,8 +51,57 @@ export function HUD() {
         <p className="hint">노랗게 깜빡일 때 누르면 제값에 팔린다. 놓쳐도 바삭한 붕어빵으로 팔린다.</p>
       </div>
 
+      {bookOpen && <Book onClose={() => setBookOpen(false)} />}
       {!snap.open && snap.report && <Settlement />}
     </>
+  );
+}
+
+/** 단골 도감. 이 게임이 쌓아 가는 것은 돈이 아니라 이 목록이다 */
+function Book({ onClose }: { onClose: () => void }) {
+  const snap = useSnapshot(4);
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>단골</h2>
+        <div className="book">
+          {REGULARS.map((r) => {
+            const visits = snap.visits[r.id] ?? 0;
+            const stage = favorStage(visits);
+            if (stage === 0) {
+              return (
+                <div key={r.id} className="card locked">
+                  <span className="card-name">???</span>
+                  <span className="card-stage">아직 모르는 사람</span>
+                </div>
+              );
+            }
+            const lines = unlockedLines(r, visits);
+            const next = FAVOR_STAGES[stage + 1];
+            return (
+              <div key={r.id} className="card">
+                <div className="card-head">
+                  <span className="card-name">{r.name}</span>
+                  <span className="card-stage">{FAVOR_STAGES[stage].label}</span>
+                </div>
+                <p className="card-blurb">{r.blurb}</p>
+                {lines.map((l, i) => (
+                  <p key={i} className="card-line">“{l}”</p>
+                ))}
+                {stage >= 4 && r.episode && <p className="card-episode">{r.episode}</p>}
+                <p className="card-progress">
+                  {visits}번 다녀감
+                  {next && ` · ${next.visits - visits}번 더 오면 ${next.label}`}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        <button className="primary" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -86,6 +144,16 @@ function Settlement() {
             )}
           </tbody>
         </table>
+
+        {r.unlocks.length > 0 && (
+          <div className="unlocks">
+            {r.unlocks.map((u, i) => (
+              <p key={i}>
+                <strong>{u.name}</strong> — {u.stageLabel}
+              </p>
+            ))}
+          </div>
+        )}
 
         <h3>가게 키우기</h3>
         <div className="upgrades">
