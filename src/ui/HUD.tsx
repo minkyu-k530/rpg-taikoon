@@ -40,7 +40,8 @@ export function HUD() {
       </div>
 
       <div className="hud-sub">
-        진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리 {snap.crowd}명 · {WEATHER[snap.weather].note}
+        진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리 {snap.crowd}명
+        {snap.upg.tteok > 0 && ` · 떡볶이 ${snap.tteokServings}그릇`} · {WEATHER[snap.weather].note}
       </div>
 
       <div className="hud-bottom">
@@ -122,7 +123,7 @@ function Book({ onClose }: { onClose: () => void }) {
 function Settlement() {
   const snap = useSnapshot(6);
   const r = snap.report!;
-  const kinds: UpgradeKind[] = ['mold', 'sign', 'heater', 'oden', 'helper'];
+  const kinds: UpgradeKind[] = ['mold', 'sign', 'heater', 'oden', 'tteok', 'helper'];
 
   return (
     <div className="overlay">
