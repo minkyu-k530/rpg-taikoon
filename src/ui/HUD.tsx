@@ -3,7 +3,7 @@ import { audio } from '../game/audio';
 import { Cutscene } from './Cutscene';
 import { Ending } from './Ending';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
-import type { DeliveryResult } from '../game/sim';
+import type { DeliveryOffer, DeliveryResult } from '../game/sim';
 import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
 import { WEATHER } from '../game/weather';
 import { sim, useSnapshot } from '../game/useSim';
@@ -63,6 +63,7 @@ export function HUD() {
         <p className="hint">노랗게 깜빡일 때 누르면 제값에 팔린다. 놓쳐도 바삭한 붕어빵으로 팔린다.</p>
       </div>
 
+      {snap.deliveryOffer && !snap.deliveryResult && <DeliveryOfferCard offer={snap.deliveryOffer} />}
       {snap.deliveryResult && <DeliveryResultPanel result={snap.deliveryResult} />}
       {snap.scene && !snap.deliveryResult && <Cutscene scene={snap.scene} />}
       {bookOpen && <Book onClose={() => setBookOpen(false)} />}
@@ -70,6 +71,29 @@ export function HUD() {
       {(snap.choosingEnding || snap.ending) && <Ending />}
       {!snap.open && snap.report && !snap.choosingEnding && !snap.ending && <Settlement />}
     </>
+  );
+}
+
+/**
+ * 손님의 배달 부탁.
+ * 화면을 막지 않는다 — 그냥 두면 사라지고, 그래도 아무 일도 일어나지 않는다.
+ */
+function DeliveryOfferCard({ offer }: { offer: DeliveryOffer }) {
+  const blocked = !sim.canDeliver();
+  return (
+    <div className={`offer ${offer.special ? 'special' : ''}`}>
+      <span className="offer-who">{offer.clientName}</span>
+      <p className="offer-line">“{offer.line}”</p>
+      <div className="offer-actions">
+        <button className="offer-no" onClick={() => sim.declineDelivery()}>
+          다음에요
+        </button>
+        <button className="offer-yes" disabled={blocked} onClick={() => sim.acceptDelivery()}>
+          {blocked ? '진열대가 비었다' : '갖다드리겠습니다'}
+        </button>
+      </div>
+      <span className="offer-timer" style={{ width: `${(offer.expires / 32) * 100}%` }} />
+    </div>
   );
 }
 

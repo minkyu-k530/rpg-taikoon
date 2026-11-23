@@ -258,3 +258,23 @@ export function nightsLeft(day: number): number | null {
   if (day < CHAPTERS[4].startDay) return null;
   return Math.max(0, FINAL_DAY - day);
 }
+
+/**
+ * 5장 특별 배달 「23층」 도착 장면 (docs/DELIVERY.md 7장).
+ * 날짜가 아니라 **그 배달을 마쳤을 때** 재생된다. 유일하게 날짜 트리거가 아닌 컷신이다.
+ */
+export const SCENE_23F: Scene = {
+  id: 'delivery-23f',
+  day: -1,
+  lines: [
+    { who: null, text: '23층. 사무실에 사람이 하나뿐이다.' },
+    { who: '박승우', text: '진짜 올라오셨네.' },
+    { who: T, text: '23층이라길래.' },
+    { who: null, text: '유리창 너머로 운중천이 내려다보인다. 저 아래 포장마차 불빛 하나.' },
+    { who: T, text: '여기서 보면 저렇게 보이는구나.' },
+    { who: '박승우', text: '매일 보고 있었어요. 저 불빛.' },
+    { who: T, text: '…나도 매일 여기를 보고 있었습니다.' },
+    { who: '박승우', text: '네?' },
+    { who: T, text: '아닙니다. 식기 전에 드세요.' },
+  ],
+};

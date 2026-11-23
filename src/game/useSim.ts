@@ -37,6 +37,7 @@ export interface Snapshot {
   deliveryProgress: number;
   canDeliver: boolean;
   deliveryResult: Sim['deliveryResult'];
+  deliveryOffer: Sim['deliveryOffer'];
   choosingEnding: boolean;
   ending: Sim['ending'];
   endingsSeen: Sim['endingsSeen'];
@@ -81,6 +82,7 @@ function read(): Snapshot {
     deliveryProgress: sim.delivery?.progress ?? 0,
     canDeliver: sim.canDeliver(),
     deliveryResult: sim.deliveryResult,
+    deliveryOffer: sim.deliveryOffer,
     choosingEnding: sim.choosingEnding,
     ending: sim.ending,
     endingsSeen: { ...sim.endingsSeen },

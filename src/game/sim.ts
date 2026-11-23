@@ -16,7 +16,7 @@ import { Delivery } from './delivery';
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
-import { chapterForDay, CHAPTERS, FINAL_DAY, SCENE_BY_DAY, type Chapter, type Scene } from './story';
+import { chapterForDay, CHAPTERS, FINAL_DAY, SCENE_23F, SCENE_BY_DAY, type Chapter, type Scene } from './story';
 import { HANDOVER_NEEDS, MOVE_PROFIT, type EndingId } from './endings';
 import { SEASONS } from './season';
 import type { SimEvent } from './audio';
@@ -103,6 +103,25 @@ export interface DeliveryResult {
   clientId: string;
 }
 
+/** 손님의 배달 부탁 */
+export interface DeliveryOffer {
+  clientId: string;
+  clientName: string;
+  /** 5장 23층 배달인가 */
+  special: boolean;
+  /** 남은 시간(초). 0이 되면 조용히 사라진다 */
+  expires: number;
+  line: string;
+}
+
+/** 배달 부탁 대사. 누가 부탁해도 어색하지 않은 말들만 둔다 */
+const REQUEST_LINES = [
+  '사무실에 좀 갖다주실 수 있어요? 사람이 더 있어서요.',
+  '저희 팀 다 같이 먹으려는데, 건너편까지 부탁드려도 될까요?',
+  '내려오기가 어려워서요. 갖다주시면 값은 더 쳐 드릴게요.',
+  '지금 손이 묶여서요. 사무실로 좀 부탁드립니다.',
+];
+
 const SEP_RADIUS_SQ = 0.81;
 /** 말풍선 표시 시간(초) */
 const SPEECH_TIME = 4.5;
@@ -166,6 +185,8 @@ export class Sim {
   deliveredToday = false;
   /** 방금 돌아온 배달의 결과. 화면에 띄워 둘 동안만 남는다 */
   deliveryResult: DeliveryResult | null = null;
+  /** 손님이 지금 부탁하고 있는 배달. 받아들이거나 그냥 두면 사라진다 */
+  deliveryOffer: DeliveryOffer | null = null;
 
   /**
    * 일어난 일을 바깥에 알린다. 지금은 소리만 듣고 있다.
@@ -277,6 +298,10 @@ export class Sim {
     this.updateMolds(dt);
     this.updateTteok(dt);
     this.delivery?.tick(dt);
+    if (this.deliveryOffer) {
+      this.deliveryOffer.expires -= dt;
+      if (this.deliveryOffer.expires <= 0) this.deliveryOffer = null;
+    }
     this.updateSpawn(dt);
     for (let i = this.villagers.length - 1; i >= 0; i--) {
       this.updateVillager(this.villagers[i], dt, i);
@@ -698,6 +723,34 @@ export class Sim {
       v.speech = lines[(Math.random() * lines.length) | 0];
       v.speechUntil = this.clock + SPEECH_TIME;
     }
+
+    this.maybeOfferDelivery(def.id, def.name, stage);
+  }
+
+  /**
+   * 배달 부탁은 **아는 손님이 방금 사 갔을 때만** 나온다.
+   * 모르는 사람이 심부름을 시키지는 않는다 (docs/DELIVERY.md 6장).
+   */
+  private maybeOfferDelivery(clientId: string, clientName: string, stage: number) {
+    if (this.day < CHAPTERS[1].startDay) return;
+    if (stage < 2 || this.deliveryOffer || this.delivery || this.deliveredToday) return;
+    // 진열대가 비어 있어도 부탁은 들어온다. 손님은 방금 사 갔으니 거의 항상 비어 있다.
+    // 들고 갈 게 있느냐는 '수락할 때' 따진다 — 그동안 구워 채우는 게 이 부탁의 긴장이다
+
+    // 5장에 박승우가 한 번 "23층까지 올라와 달라"고 한다
+    const special =
+      this.day >= CHAPTERS[4].startDay && clientId === 'seungwoo' && !this.seenScenes[SCENE_23F.id];
+    if (!special && Math.random() > 0.3) return;
+
+    this.deliveryOffer = {
+      clientId,
+      clientName,
+      special,
+      expires: 32,
+      line: special
+        ? '오늘 저 혼자 남았어요. 23층인데… 올라와 주실 수 있어요?'
+        : REQUEST_LINES[(Math.random() * REQUEST_LINES.length) | 0],
+    };
   }
 
   // ---------------------------------------------------------------- 하루
@@ -757,6 +810,20 @@ export class Sim {
     return !this.delivery && this.open && !this.deliveredToday && this.tray.length >= 3;
   }
 
+  /** 부탁을 받아들인다 */
+  acceptDelivery() {
+    const offer = this.deliveryOffer;
+    if (!offer) return false;
+    const ok = this.startDelivery(offer.clientId, offer.clientName, offer.special);
+    if (ok) this.deliveryOffer = null;
+    return ok;
+  }
+
+  /** 거절. 아무 일도 일어나지 않는다 — 호감도는 깎이지 않는다 */
+  declineDelivery() {
+    this.deliveryOffer = null;
+  }
+
   startDelivery(clientId: string, clientName: string, special = false) {
     if (!this.canDeliver()) return false;
     const count = Math.min(Sim.DELIVERY_MAX, this.tray.length);
@@ -777,6 +844,14 @@ export class Sim {
     this.deliveredToday = true;
     this.delivery = null;
     this.deliveryResult = { revenue, delivered: d.left, lost: d.lost, carried: d.carried, clientId: d.clientId };
+
+    // 무사히 전한 만큼 관계가 쌓인다. 한 번에 몰아 주지는 않는다
+    if (d.left > 0) {
+      const gain = Math.min(3, Math.ceil(d.left / 3));
+      this.visits[d.clientId] = (this.visits[d.clientId] ?? 0) + gain;
+    }
+    // 23층 배달을 마치면 그 장면이 재생된다
+    if (d.special && !this.seenScenes[SCENE_23F.id]) this.scene = SCENE_23F;
     this.persist();
     return this.deliveryResult;
   }
@@ -801,6 +876,10 @@ export class Sim {
     this.money = CONFIG.startMoney;
     this.upg = emptyUpgrades();
     this.totalProfit = 0;
+    this.delivery = null;
+    this.deliveredToday = false;
+    this.deliveryOffer = null;
+    this.deliveryResult = null;
     this.ending = null;
     this.choosingEnding = false;
     this.dayTime = 0;
