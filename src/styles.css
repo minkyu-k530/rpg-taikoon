@@ -101,6 +101,114 @@ canvas {
   color: #a9c3e8;
 }
 
+/* ---------------------------------------------------------------- 컷신 */
+
+.chip-nights {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  color: #e8a0a0;
+}
+
+.chapter-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 10, 16, 0.82);
+  pointer-events: none;
+  animation: cardIn 2.6s ease forwards;
+}
+
+.chapter-card p {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--fg);
+}
+
+@keyframes cardIn {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 화면 전체를 막지 않는다. 뒤에서 가게는 계속 돌아간다 */
+.cutscene {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* 뒤집기 버튼 줄을 덮지 않는다. 컷신 중에도 직접 구울 수 있어야 한다 */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  padding: 50px 14px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(to top, rgba(7, 10, 16, 0.75), rgba(7, 10, 16, 0));
+  cursor: pointer;
+}
+
+.cutscene-skip {
+  align-self: flex-end;
+  background: rgba(16, 20, 28, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cutscene-box {
+  width: min(560px, 100%);
+  background: rgba(16, 20, 28, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px 12px;
+  backdrop-filter: blur(6px);
+}
+
+.cutscene-box.narration {
+  background: rgba(10, 14, 22, 0.82);
+  border-style: dashed;
+}
+
+.cutscene-who {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a9c3e8;
+}
+
+.cutscene-who.me {
+  color: var(--warm);
+}
+
+.cutscene-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.cutscene-box.narration .cutscene-text {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.cutscene-next {
+  display: block;
+  margin-top: 10px;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
 .upgrade.danger {
   border-color: rgba(217, 128, 128, 0.5);
   color: #e8a0a0;
