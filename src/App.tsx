@@ -6,7 +6,9 @@ import { Weather } from './scene/Weather';
 import { Stall } from './scene/Stall';
 import { Crowd } from './scene/Crowd';
 import { HUD } from './ui/HUD';
-import { sim } from './game/useSim';
+import { DeliveryScene } from './scene/DeliveryScene';
+import { DeliveryHUD } from './ui/DeliveryHUD';
+import { sim, useSnapshot } from './game/useSim';
 import { audio } from './game/audio';
 
 export default function App() {
@@ -22,6 +24,9 @@ export default function App() {
     };
   }, []);
 
+  // 배달 중에는 씬과 HUD가 통째로 바뀐다. 가게 시뮬레이션은 뒤에서 계속 돈다
+  const delivering = useSnapshot(6).delivering;
+
   return (
     <div className="app">
       <Canvas
@@ -33,14 +38,20 @@ export default function App() {
           gl.toneMappingExposure = 1.15;
         }}
       >
-        <CameraRig />
         <Ticker />
-        <Environment />
-        <Stall />
-        <Crowd />
-        <Weather />
+        {delivering ? (
+          <DeliveryScene />
+        ) : (
+          <>
+            <CameraRig />
+            <Environment />
+            <Stall />
+            <Crowd />
+            <Weather />
+          </>
+        )}
       </Canvas>
-      <HUD />
+      {delivering ? <DeliveryHUD /> : <HUD />}
     </div>
   );
 }
