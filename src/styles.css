@@ -298,6 +298,92 @@ canvas {
   color: var(--muted);
 }
 
+/* ---------------------------------------------------------------- 배달 */
+
+.delivery-dist {
+  margin-left: auto;
+}
+
+.delivery-bar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 52px);
+  left: 14px;
+  right: 14px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.delivery-fill {
+  display: block;
+  height: 100%;
+  background: var(--warm);
+  transition: width 0.1s linear;
+}
+
+.delivery-hit {
+  position: absolute;
+  top: 38%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #e8a0a0;
+  pointer-events: none;
+  animation: hitPop 1.2s ease forwards;
+}
+
+@keyframes hitPop {
+  0% { opacity: 0; transform: translateY(8px) scale(0.9); }
+  15% { opacity: 1; transform: translateY(0) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.delivery-pad {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.pad-btn {
+  width: 74px;
+  height: 56px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.pad-btn:active {
+  transform: scale(0.94);
+}
+
+.pad-btn.jump {
+  background: var(--warm);
+  color: #1a1206;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.delivery-hint {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  left: 0;
+  right: 0;
+}
+
 .icon-btn {
   margin-left: auto;
   pointer-events: auto;

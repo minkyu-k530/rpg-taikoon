@@ -3,6 +3,7 @@ import { audio } from '../game/audio';
 import { Cutscene } from './Cutscene';
 import { Ending } from './Ending';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
+import type { DeliveryResult } from '../game/sim';
 import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
 import { WEATHER } from '../game/weather';
 import { sim, useSnapshot } from '../game/useSim';
@@ -62,12 +63,56 @@ export function HUD() {
         <p className="hint">노랗게 깜빡일 때 누르면 제값에 팔린다. 놓쳐도 바삭한 붕어빵으로 팔린다.</p>
       </div>
 
-      {snap.scene && <Cutscene scene={snap.scene} />}
+      {snap.deliveryResult && <DeliveryResultPanel result={snap.deliveryResult} />}
+      {snap.scene && !snap.deliveryResult && <Cutscene scene={snap.scene} />}
       {bookOpen && <Book onClose={() => setBookOpen(false)} />}
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
       {(snap.choosingEnding || snap.ending) && <Ending />}
       {!snap.open && snap.report && !snap.choosingEnding && !snap.ending && <Settlement />}
     </>
+  );
+}
+
+/** 배달에서 돌아온 직후. 가게 화면 위에 뜬다 */
+function DeliveryResultPanel({ result }: { result: DeliveryResult }) {
+  return (
+    <div className="overlay ending">
+      <div className="sheet">
+        <h2>도착</h2>
+        <table className="report">
+          <tbody>
+            <tr>
+              <td>들고 나간 것</td>
+              <td>{result.carried}개</td>
+            </tr>
+            <tr>
+              <td>무사히 전한 것</td>
+              <td>{result.delivered}개</td>
+            </tr>
+            {result.lost > 0 && (
+              <tr className="muted">
+                <td>길에서 잃은 것</td>
+                <td>{result.lost}개</td>
+              </tr>
+            )}
+            <tr className="sum">
+              <td>받은 돈</td>
+              <td>{won(result.revenue)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="forecast">
+          {result.delivered === result.carried
+            ? '하나도 안 흘렸다.'
+            : result.delivered === 0
+              ? '빈손으로 도착했다. 그래도 와 줘서 고맙다고 했다.'
+              : '그래도 따뜻할 때 도착했다.'}
+        </p>
+        <button className="primary" onClick={() => sim.closeDeliveryResult()}>
+          가게로 돌아가기
+        </button>
+      </div>
+    </div>
   );
 }
 

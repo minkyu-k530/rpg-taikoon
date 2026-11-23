@@ -90,6 +90,19 @@ export interface DayReport {
 
 export type { Upgrades } from './config';
 
+/** 배달 한 번의 결과 */
+export interface DeliveryResult {
+  /** 받은 돈 */
+  revenue: number;
+  /** 무사히 전한 개수 */
+  delivered: number;
+  /** 길에서 잃은 개수 */
+  lost: number;
+  /** 들고 나간 개수 */
+  carried: number;
+  clientId: string;
+}
+
 const SEP_RADIUS_SQ = 0.81;
 /** 말풍선 표시 시간(초) */
 const SPEECH_TIME = 4.5;
@@ -151,6 +164,8 @@ export class Sim {
   delivery: Delivery | null = null;
   /** 오늘 배달을 다녀왔는가. 하루 한 번 */
   deliveredToday = false;
+  /** 방금 돌아온 배달의 결과. 화면에 띄워 둘 동안만 남는다 */
+  deliveryResult: DeliveryResult | null = null;
 
   /**
    * 일어난 일을 바깥에 알린다. 지금은 소리만 듣고 있다.
@@ -751,7 +766,7 @@ export class Sim {
   }
 
   /** 도착. 들고 간 것 중 남은 만큼 판다 */
-  finishDelivery() {
+  finishDelivery(): DeliveryResult | null {
     const d = this.delivery;
     if (!d) return null;
     const revenue = d.left * Sim.DELIVERY_PRICE;
@@ -761,8 +776,14 @@ export class Sim {
     if (d.left > 0) this.stats.customers++;
     this.deliveredToday = true;
     this.delivery = null;
+    this.deliveryResult = { revenue, delivered: d.left, lost: d.lost, carried: d.carried, clientId: d.clientId };
     this.persist();
-    return { revenue, delivered: d.left, lost: d.lost, carried: d.carried, clientId: d.clientId };
+    return this.deliveryResult;
+  }
+
+  /** 결과 화면을 닫는다. 이때 비로소 가게 화면으로 돌아온다 */
+  closeDeliveryResult() {
+    this.deliveryResult = null;
   }
 
   chooseEnding(id: EndingId) {

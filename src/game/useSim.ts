@@ -32,6 +32,11 @@ export interface Snapshot {
   season: Season;
   nightsLeft: number | null;
   scene: Sim['scene'];
+  /** 배달 중인가. 진행률은 0~1 */
+  delivering: boolean;
+  deliveryProgress: number;
+  canDeliver: boolean;
+  deliveryResult: Sim['deliveryResult'];
   choosingEnding: boolean;
   ending: Sim['ending'];
   endingsSeen: Sim['endingsSeen'];
@@ -72,6 +77,10 @@ function read(): Snapshot {
     season: sim.chapter.season,
     nightsLeft: nightsLeft(sim.day),
     scene: sim.scene,
+    delivering: sim.delivery !== null,
+    deliveryProgress: sim.delivery?.progress ?? 0,
+    canDeliver: sim.canDeliver(),
+    deliveryResult: sim.deliveryResult,
     choosingEnding: sim.choosingEnding,
     ending: sim.ending,
     endingsSeen: { ...sim.endingsSeen },
