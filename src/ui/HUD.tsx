@@ -10,7 +10,7 @@ const won = (n: number) => n.toLocaleString('ko-KR') + '원';
 export function HUD() {
   const snap = useSnapshot();
   const [bookOpen, setBookOpen] = useState(false);
-  const [muted, setMuted] = useState(audio.muted);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [flipA, flipB] = CONFIG.bake.flipWindow;
 
   const known = REGULARS.filter((r) => (snap.visits[r.id] ?? 0) >= FAVOR_STAGES[1].visits).length;
@@ -24,15 +24,8 @@ export function HUD() {
           <span className="chip-weather">{WEATHER[snap.weather].label}</span>
         </div>
         <div className="chip money">{won(snap.money)}</div>
-        <button
-          className="chip icon-btn"
-          onClick={() => {
-            audio.start();
-            audio.setMuted(!muted);
-            setMuted(!muted);
-          }}
-        >
-          {muted ? '소리 꺼짐' : '소리 켜짐'}
+        <button className="chip icon-btn" onClick={() => setSettingsOpen(true)}>
+          설정
         </button>
         <button className="chip book-btn" onClick={() => setBookOpen(true)}>
           단골 {known}/{REGULARS.length}
@@ -67,8 +60,67 @@ export function HUD() {
       </div>
 
       {bookOpen && <Book onClose={() => setBookOpen(false)} />}
+      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
       {!snap.open && snap.report && <Settlement />}
     </>
+  );
+}
+
+/** 설정. 소리와 저장 초기화만 있다 */
+function Settings({ onClose }: { onClose: () => void }) {
+  const [muted, setMuted] = useState(audio.muted);
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>설정</h2>
+        <div className="upgrades">
+          <button
+            className="upgrade"
+            onClick={() => {
+              audio.start();
+              audio.setMuted(!muted);
+              setMuted(!muted);
+            }}
+          >
+            <span className="u-name">소리</span>
+            <span className="u-desc">물소리, 기름 끓는 소리, 눈 오는 날의 먹먹함</span>
+            <span className="u-cost">{muted ? '꺼짐' : '켜짐'}</span>
+          </button>
+        </div>
+
+        <h3>처음부터 다시</h3>
+        {confirming ? (
+          <div className="upgrades">
+            <button
+              className="upgrade danger"
+              onClick={() => {
+                sim.resetProgress();
+                onClose();
+              }}
+            >
+              <span className="u-name">정말 지운다</span>
+              <span className="u-desc">날짜·돈·설비·단골 기록이 모두 사라진다</span>
+            </button>
+            <button className="upgrade" onClick={() => setConfirming(false)}>
+              <span className="u-name">그만두기</span>
+            </button>
+          </div>
+        ) : (
+          <div className="upgrades">
+            <button className="upgrade" onClick={() => setConfirming(true)}>
+              <span className="u-name">저장 지우기</span>
+              <span className="u-desc">1일차부터 다시 시작한다</span>
+            </button>
+          </div>
+        )}
+
+        <button className="primary" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+    </div>
   );
 }
 
