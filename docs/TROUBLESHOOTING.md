@@ -38,12 +38,16 @@
   | `GET .../info/refs?service=git-upload-pack` (git 프로토콜) | **200** |
   | `gh api user/repos?per_page=100` (69개 전부) | `rpg-freestyle` 없음 |
 
-- **원인**: 같은 토큰으로 **git 프로토콜은 200, REST/GraphQL은 404**. 계정명 `JungMK0720`이 API에서 조회되지 않는 것으로 보아 레포 소유 계정이 이름 변경되었거나 접근 경로가 바뀐 상태. git은 리다이렉트를 따라가지만 API는 옛 경로를 404로 끊는다.
-- **해결**: 미해결. 아래 중 하나 필요
-  1. 레포 소유 계정으로 `gh auth login`을 추가하고 `gh auth switch`
-  2. `git remote set-url origin <현재 정식 URL>`로 remote 갱신
-- **우회**: 브랜치 push는 정상이므로, push 후 GitHub가 출력하는 `pull/new/<branch>` 링크로 사람이 PR을 생성
-- **교훈**: `gh`가 404를 뱉고 `git`은 되면 권한이 아니라 **경로(계정명/레포명) 문제**를 먼저 의심한다. `gh api users/<owner>`를 찍어보면 1초 만에 갈린다.
+- **진짜 원인**: `JungMK0720/rpg-freestyle` **레포가 애초에 존재하지 않았다.** 과거에 만들려다 만 remote 주소가 `.git/config`에 그대로 남아 있었던 것.
+  - **미확인**: 그럼 `git push`와 `git ls-remote`는 왜 성공했는가. 이건 끝까지 설명하지 못했다. 추측하지 않고 "원인 미상"으로 남긴다. 다시 만나면 `GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push`로 실제 요청 URL과 응답을 먼저 찍을 것.
+  - 확실한 것: **`git push`가 성공했다고 레포가 GitHub에 존재한다는 뜻은 아니었다.**
+- **해결**: 새 레포를 만들고 remote를 갈아끼움
+  ```sh
+  gh repo create rpg-taikoon --public --description "..."
+  git remote set-url origin https://github.com/minkyu-k530/rpg-taikoon.git
+  git push -u origin main
+  ```
+- **교훈**: `gh`는 404인데 `git`은 되면 권한이 아니라 **경로(계정명/레포명) 문제**를 먼저 의심한다. `gh api users/<owner>`를 찍으면 1초 만에 갈린다. 계정이 404면 레포도 없는 것이다.
 
 ---
 
