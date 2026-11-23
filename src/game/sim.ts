@@ -12,6 +12,7 @@ import {
   type UpgradeKind,
   type Upgrades,
 } from './config';
+import { Delivery } from './delivery';
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
@@ -144,6 +145,14 @@ export class Sim {
   seenScenes: Record<string, true> = {};
 
   /**
+   * 지금 나가 있는 배달. null이면 가게에 있다.
+   * 배달 중에도 아래 tick()은 그대로 돈다 — 자리를 비우는 대가가 이 모드의 핵심이다 (docs/DELIVERY.md)
+   */
+  delivery: Delivery | null = null;
+  /** 오늘 배달을 다녀왔는가. 하루 한 번 */
+  deliveredToday = false;
+
+  /**
    * 일어난 일을 바깥에 알린다. 지금은 소리만 듣고 있다.
    * 시뮬레이션이 오디오를 import 해서 직접 울리면 테스트에서 분리가 안 된다
    */
@@ -252,6 +261,7 @@ export class Sim {
     this.dayTime += dt;
     this.updateMolds(dt);
     this.updateTteok(dt);
+    this.delivery?.tick(dt);
     this.updateSpawn(dt);
     for (let i = this.villagers.length - 1; i >= 0; i--) {
       this.updateVillager(this.villagers[i], dt, i);
@@ -331,6 +341,8 @@ export class Sim {
 
   /** 뒤집기. 창 밖에서 눌러도 벌점은 없다 — 이 게임에 실패는 없다 */
   flip(index: number) {
+    // 배달 나가 있으면 뒤집을 사람이 없다. 알바가 있으면 알바가 대신한다
+    if (this.delivery) return false;
     const m = this.molds[index];
     if (!m || !m.baking || m.flipped) return false;
     const [a, b] = CONFIG.bake.flipWindow;
@@ -718,6 +730,41 @@ export class Sim {
     return { available: true, reason: null };
   }
 
+  // ---------------------------------------------------------------- 배달
+
+  /** 한 번에 들고 나갈 수 있는 최대 개수 */
+  static readonly DELIVERY_MAX = 8;
+  /** 배달 단가. 가게에서 파는 값의 2.5배 */
+  static readonly DELIVERY_PRICE = 2500;
+
+  /** 지금 배달을 나갈 수 있는가 */
+  canDeliver() {
+    return !this.delivery && this.open && !this.deliveredToday && this.tray.length >= 3;
+  }
+
+  startDelivery(clientId: string, clientName: string, special = false) {
+    if (!this.canDeliver()) return false;
+    const count = Math.min(Sim.DELIVERY_MAX, this.tray.length);
+    this.tray.splice(0, count);
+    this.delivery = new Delivery({ count, clientId, clientName, special });
+    return true;
+  }
+
+  /** 도착. 들고 간 것 중 남은 만큼 판다 */
+  finishDelivery() {
+    const d = this.delivery;
+    if (!d) return null;
+    const revenue = d.left * Sim.DELIVERY_PRICE;
+    this.money += revenue;
+    this.stats.revenue += revenue;
+    this.stats.sold += d.left;
+    if (d.left > 0) this.stats.customers++;
+    this.deliveredToday = true;
+    this.delivery = null;
+    this.persist();
+    return { revenue, delivered: d.left, lost: d.lost, carried: d.carried, clientId: d.clientId };
+  }
+
   chooseEnding(id: EndingId) {
     if (!this.endingStatus(id).available) return false;
     this.ending = id;
@@ -759,6 +806,8 @@ export class Sim {
     this.report = null;
     this.stats = { customers: 0, sold: 0, revenue: 0, cost: 0, missed: 0, shortfall: 0 };
     this.todayUnlocks = [];
+    this.delivery = null;
+    this.deliveredToday = false;
     this.villagers = [];
     this.queue = [];
     this.tray = [];
