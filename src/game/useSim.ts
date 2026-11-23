@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { CONFIG, type Upgrades } from './config';
 import type { Look } from './residents';
 import type { Weather } from './weather';
-import { nightsLeft } from './story';
+import { nightsLeft, type Season } from './story';
 import { Sim } from './sim';
 
 /** 시뮬레이션 인스턴스는 하나. 렌더러는 이걸 읽기만 한다 */
@@ -29,6 +29,7 @@ export interface Snapshot {
   tteokServings: number;
   weather: Weather;
   chapter: { no: number; title: string };
+  season: Season;
   nightsLeft: number | null;
   scene: Sim['scene'];
   report: Sim['report'];
@@ -63,6 +64,7 @@ function read(): Snapshot {
     tteokServings: sim.tteokPot.servings,
     weather: sim.weather,
     chapter: { no: sim.chapter.no, title: sim.chapter.title },
+    season: sim.chapter.season,
     nightsLeft: nightsLeft(sim.day),
     scene: sim.scene,
     report: sim.report,

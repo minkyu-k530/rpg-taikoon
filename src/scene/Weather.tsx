@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { sim } from '../game/useSim';
-import type { Weather as WeatherKind } from '../game/weather';
+import { SEASONS } from '../game/season';
 
 const FIELD = {
   width: 34,
@@ -12,7 +12,7 @@ const FIELD = {
   centerZ: -2,
 };
 
-const COUNT = { clear: 0, snow: 900, rain: 1400 } as const;
+const COUNT = { clear: 0, snow: 900, rain: 1400, petal: 450 } as const;
 
 /**
  * 눈과 비.
@@ -23,22 +23,26 @@ const COUNT = { clear: 0, snow: 900, rain: 1400 } as const;
 export function Weather() {
   const snow = useRef<THREE.Points>(null);
   const rain = useRef<THREE.LineSegments>(null);
-  const current = useRef<WeatherKind>(sim.weather);
+  const petals = useRef<THREE.Points>(null);
 
   const snowGeo = useMemo(() => makePointGeometry(COUNT.snow), []);
   const rainGeo = useMemo(() => makeLineGeometry(COUNT.rain), []);
+  const petalGeo = useMemo(() => makePointGeometry(COUNT.petal), []);
   const snowVel = useMemo(() => makeVelocities(COUNT.snow, 0.5, 1.1, 0.35), []);
   const rainVel = useMemo(() => makeVelocities(COUNT.rain, 9, 13, 0.6), []);
+  // 꽃잎은 눈보다 느리고 옆으로 더 많이 흘러간다
+  const petalVel = useMemo(() => makeVelocities(COUNT.petal, 0.25, 0.6, 0.9), []);
 
   useLayoutEffect(() => {
     snowGeo.computeBoundingSphere();
     rainGeo.computeBoundingSphere();
-  }, [snowGeo, rainGeo]);
+    petalGeo.computeBoundingSphere();
+  }, [snowGeo, rainGeo, petalGeo]);
 
   useFrame((_, dt) => {
     const step = Math.min(dt, 0.05);
-    current.current = sim.weather;
-    const w = current.current;
+    const w = sim.weather;
+    const spring = SEASONS[sim.chapter.season].petals;
 
     if (snow.current) {
       snow.current.visible = w === 'snow';
@@ -48,12 +52,20 @@ export function Weather() {
       rain.current.visible = w === 'rain';
       if (w === 'rain') fallLines(rainGeo, rainVel, step);
     }
+    if (petals.current) {
+      // 비가 오면 꽃잎은 보이지 않는다. 두 입자가 겹치면 지저분해진다
+      petals.current.visible = spring && w !== 'rain';
+      if (petals.current.visible) fallPoints(petalGeo, petalVel, step, true);
+    }
   });
 
   return (
     <group position={[0, 0, FIELD.centerZ]}>
       <points ref={snow} geometry={snowGeo} frustumCulled={false}>
         <pointsMaterial size={0.09} color="#e8eefb" transparent opacity={0.85} sizeAttenuation depthWrite={false} />
+      </points>
+      <points ref={petals} geometry={petalGeo} frustumCulled={false}>
+        <pointsMaterial size={0.11} color="#f2c6d8" transparent opacity={0.8} sizeAttenuation depthWrite={false} />
       </points>
       <lineSegments ref={rain} geometry={rainGeo} frustumCulled={false}>
         <lineBasicMaterial color="#9fc0e8" transparent opacity={0.35} depthWrite={false} />
