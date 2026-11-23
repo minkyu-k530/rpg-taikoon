@@ -71,14 +71,17 @@ export const CONFIG = {
   /** 재고가 없을 때 기다려 주는 시간(초). 넘으면 화내지 않고 그냥 간다 */
   patience: 14,
 
-  /** 업그레이드 */
+  /**
+   * 업그레이드. `unlockDay`는 이야기에서 그 물건을 떠올리는 날이다 (docs/STORY.md).
+   * 돈이 있어도 그날 전에는 못 산다 — 가게가 커지는 순서가 곧 이야기 순서다
+   */
   upgrades: {
-    mold: { label: '붕어빵 틀', base: 18000, mult: 1.9, max: 6, desc: '한 번에 굽는 개수 +1' },
-    sign: { label: '간판', base: 15000, mult: 2.2, max: 3, desc: '지나가는 사람 +30%' },
-    heater: { label: '온풍기', base: 12000, mult: 2.0, max: 3, desc: '사 먹을 확률 +5%p' },
-    oden: { label: '어묵탕', base: 25000, mult: 1, max: 1, desc: '조작 없이 팔리는 메뉴 해금' },
-    tteok: { label: '떡볶이 솥', base: 60000, mult: 1, max: 1, desc: '4,000원짜리 메뉴 해금' },
-    helper: { label: '알바', base: 45000, mult: 2.4, max: 2, desc: '뒤집기를 대신해 준다' },
+    mold: { label: '붕어빵 틀', base: 18000, mult: 1.9, max: 6, unlockDay: 1, desc: '한 번에 굽는 개수 +1' },
+    sign: { label: '간판', base: 15000, mult: 2.2, max: 3, unlockDay: 1, desc: '지나가는 사람 +30%' },
+    heater: { label: '온풍기', base: 12000, mult: 2.0, max: 3, unlockDay: 1, desc: '사 먹을 확률 +5%p' },
+    oden: { label: '어묵탕', base: 25000, mult: 1, max: 1, unlockDay: 7, desc: '조작 없이 팔리는 메뉴 해금' },
+    tteok: { label: '떡볶이 솥', base: 60000, mult: 1, max: 1, unlockDay: 19, desc: '4,000원짜리 메뉴 해금' },
+    helper: { label: '알바', base: 45000, mult: 2.4, max: 2, unlockDay: 38, desc: '뒤집기를 대신해 준다' },
   },
   /** 시작 틀 개수 */
   baseMolds: 2,

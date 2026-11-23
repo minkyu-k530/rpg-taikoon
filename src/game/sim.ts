@@ -6,6 +6,7 @@ import { CONFIG, LAYOUT, queueSlot, rand, upgradeCost, type UpgradeKind, type Up
 import { favorStage, RESIDENTS, RESIDENT_BY_ID, unlockedLines, type Look, type ResidentDef } from './residents';
 import * as storage from './save';
 import { rollWeather, WEATHER, type Weather } from './weather';
+import { chapterForDay, SCENE_BY_DAY, type Chapter, type Scene } from './story';
 import type { SimEvent } from './audio';
 
 export type Phase = 'walk' | 'browse' | 'queue' | 'serve' | 'eat' | 'leave';
@@ -117,6 +118,11 @@ export class Sim {
   /** 시작 후 누적 시간(초). 말풍선 타이머에 쓴다 */
   clock = 0;
 
+  /** 지금 재생 중인 컷신. 시뮬레이션은 이것과 무관하게 계속 돈다 */
+  scene: Scene | null = null;
+  /** 이미 본 컷신. 2회차에서 건너뛰는 데 쓴다 */
+  seenScenes: Record<string, true> = {};
+
   /**
    * 일어난 일을 바깥에 알린다. 지금은 소리만 듣고 있다.
    * 시뮬레이션이 오디오를 import 해서 직접 울리면 테스트에서 분리가 안 된다
@@ -133,6 +139,23 @@ export class Sim {
   constructor() {
     this.resetMolds();
     this.restore();
+    this.maybeStartScene();
+  }
+
+  get chapter(): Chapter {
+    return chapterForDay(this.day);
+  }
+
+  /** 그날의 컷신이 있고 아직 본 적 없으면 띄운다 */
+  private maybeStartScene() {
+    const s = SCENE_BY_DAY.get(this.day);
+    if (s && !this.seenScenes[s.id]) this.scene = s;
+  }
+
+  endScene() {
+    if (this.scene) this.seenScenes[this.scene.id] = true;
+    this.scene = null;
+    this.persist();
   }
 
   // ---------------------------------------------------------------- 저장
@@ -146,6 +169,7 @@ export class Sim {
     this.visits = { ...data.visits };
     if (isWeather(data.weather)) this.weather = data.weather;
     if (isWeather(data.tomorrow)) this.tomorrow = data.tomorrow;
+    this.seenScenes = { ...data.seenScenes };
     this.resetMolds();
   }
 
@@ -157,6 +181,7 @@ export class Sim {
       visits: this.visits,
       weather: this.weather,
       tomorrow: this.tomorrow,
+      seenScenes: this.seenScenes,
     });
   }
 
@@ -166,8 +191,11 @@ export class Sim {
     this.money = CONFIG.startMoney;
     this.upg = { mold: 0, sign: 0, heater: 0, oden: 0, tteok: 0, helper: 0 };
     this.visits = {};
+    this.seenScenes = {};
     this.nextDay();
     this.day = 1;
+    this.scene = null;
+    this.maybeStartScene();
   }
 
   // ---------------------------------------------------------------- 틀
@@ -638,14 +666,17 @@ export class Sim {
     this.tray = [];
     this.tteokPot = { cooking: false, t: 0, servings: 0 };
     this.resetMolds();
+    this.maybeStartScene();
     this.persist();
   }
 
   // ---------------------------------------------------------------- 업그레이드
 
   canBuy(kind: UpgradeKind) {
+    const u = CONFIG.upgrades[kind];
+    if (this.day < u.unlockDay) return false;
     const level = this.upg[kind];
-    if (level >= CONFIG.upgrades[kind].max) return false;
+    if (level >= u.max) return false;
     return this.money >= upgradeCost(kind, level);
   }
 

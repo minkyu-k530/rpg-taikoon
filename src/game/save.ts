@@ -12,6 +12,8 @@ export interface SaveData {
   upg: Upgrades;
   /** 주민 id별 구매 횟수 */
   visits: Record<string, number>;
+  /** 이미 본 컷신 id */
+  seenScenes: Record<string, true>;
   weather?: string;
   tomorrow?: string;
 }
@@ -24,7 +26,7 @@ export function load(): SaveData | null {
     if (data.version !== VERSION) return null;
     if (typeof data.money !== 'number' || typeof data.day !== 'number') return null;
     if (!data.upg || !data.visits) return null;
-    return data as SaveData;
+    return { ...data, seenScenes: data.seenScenes ?? {} } as SaveData;
   } catch {
     // 손상된 저장은 조용히 버린다. 플레이어에게 보여 줄 이유가 없다
     return null;

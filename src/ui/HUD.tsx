@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { audio } from '../game/audio';
+import { Cutscene } from './Cutscene';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
 import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
 import { WEATHER } from '../game/weather';
@@ -22,6 +23,7 @@ export function HUD() {
           <span className="chip-label">{snap.day}일차</span>
           <span className="chip-time">{Math.ceil(snap.timeLeft)}초</span>
           <span className="chip-weather">{WEATHER[snap.weather].label}</span>
+          {snap.nightsLeft !== null && <span className="chip-nights">남은 밤 {snap.nightsLeft}</span>}
         </div>
         <div className="chip money">{won(snap.money)}</div>
         <button className="chip icon-btn" onClick={() => setSettingsOpen(true)}>
@@ -33,8 +35,8 @@ export function HUD() {
       </div>
 
       <div className="hud-sub">
-        진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리 {snap.crowd}명
-        {snap.upg.tteok > 0 && ` · 떡볶이 ${snap.tteokServings}그릇`} · {WEATHER[snap.weather].note}
+        {snap.chapter.no}장 {snap.chapter.title} · 진열 {snap.tray}/{snap.trayCap} · 줄 {snap.queue}명 · 거리{' '}
+        {snap.crowd}명{snap.upg.tteok > 0 && ` · 떡볶이 ${snap.tteokServings}그릇`}
       </div>
 
       <div className="hud-bottom">
@@ -59,6 +61,7 @@ export function HUD() {
         <p className="hint">노랗게 깜빡일 때 누르면 제값에 팔린다. 놓쳐도 바삭한 붕어빵으로 팔린다.</p>
       </div>
 
+      {snap.scene && <Cutscene scene={snap.scene} />}
       {bookOpen && <Book onClose={() => setBookOpen(false)} />}
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
       {!snap.open && snap.report && <Settlement />}
@@ -237,14 +240,16 @@ function Settlement() {
             const level = snap.upg[k];
             const maxed = level >= u.max;
             const cost = upgradeCost(k, level);
-            const afford = !maxed && snap.money >= cost;
+            // 아직 이야기에서 떠올리지 않은 물건은 못 산다. 숨기지 않고 언제 열리는지 적는다
+            const locked = r.day < u.unlockDay;
+            const afford = !locked && !maxed && snap.money >= cost;
             return (
               <button key={k} className="upgrade" disabled={!afford} onClick={() => sim.buy(k)}>
                 <span className="u-name">
                   {u.label} {u.max > 1 && `Lv.${level}`}
                 </span>
-                <span className="u-desc">{u.desc}</span>
-                <span className="u-cost">{maxed ? '최대' : won(cost)}</span>
+                <span className="u-desc">{locked ? `${u.unlockDay}일차에 생각난다` : u.desc}</span>
+                <span className="u-cost">{locked ? '—' : maxed ? '최대' : won(cost)}</span>
               </button>
             );
           })}
