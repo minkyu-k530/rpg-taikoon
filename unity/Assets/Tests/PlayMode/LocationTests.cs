@@ -8,12 +8,11 @@ using Unjungcheon.Game;
 
 namespace Unjungcheon.PlayModeTests
 {
-    // 생성된 1번 공간 씬을 불러와 이동, 도로 건너가기 금지, 시점 전환, 상호작용 → Core 연결을 확인한다.
+    // 생성된 1번 공간 씬을 불러와 이동, 출입 제한, 시점 전환, 상호작용을 확인한다.
     // 입력은 IGameInput 대역으로 주입한다.
     public sealed class LocationTests
     {
         const string ScenePath = "Assets/Scenes/Location1_Skala.unity";
-        const float RoadNearEdgeZ = -4f;
 
         sealed class TestInput : IGameInput
         {
@@ -21,7 +20,12 @@ namespace Unjungcheon.PlayModeTests
             public Vector2 Look { get; set; }
             public bool Run { get; set; }
             public bool InteractDown { get; set; }
+            public bool GroupAcceptDown { get; set; }
+            public bool GroupDeclineDown { get; set; }
             public bool ViewDown { get; set; }
+            public bool Jump { get; set; }
+            public bool SkipDown { get; set; }
+            public bool RestartDown { get; set; }
         }
 
         TestInput input;
@@ -90,16 +94,15 @@ namespace Unjungcheon.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator OwnerCannotCrossRoad()
+        public IEnumerator OwnerCrossesRoadToPlaza()
         {
-            Teleport(new Vector3(-20f, player.transform.position.y, -6.5f));
+            Teleport(new Vector3(18f, player.transform.position.y, -6.5f));
             input.Move = Vector2.up;
             input.Run = true;
-            yield return Hold(3f);
+            yield return Hold(8f);
             input.Move = Vector2.zero; input.Run = false;
             float z = player.transform.position.z;
-            Assert.LessOrEqual(z, player.MaxZ + .01f);
-            Assert.Less(z, RoadNearEdgeZ, "경계석 안쪽 보도에 머문다");
+            Assert.Greater(z, 7f, "도로를 건너 정문 광장까지 간다");
         }
 
         [UnityTest]
@@ -153,6 +156,57 @@ namespace Unjungcheon.PlayModeTests
             double before = sim.HawkReady;
             yield return Press(v => input.InteractDown = v);
             Assert.Greater(sim.HawkReady, before, "Hawk 쿨다운 시작");
+        }
+
+        [UnityTest]
+        public IEnumerator MainEntranceRefusesAndBlocks()
+        {
+            Teleport(new Vector3(1.75f, player.transform.position.y, 29f));
+            input.Move = Vector2.up;
+            yield return Hold(2f);
+            input.Move = Vector2.zero;
+            var toast = Object.FindAnyObjectByType<Toast>();
+            Assert.IsTrue(toast.Message.enabled);
+            Assert.AreEqual("SKALA 구성원이 아니라 들어갈 수 없습니다!", toast.Message.text);
+            Assert.Less(player.transform.position.z, 34f);
+        }
+
+        [UnityTest]
+        public IEnumerator PedestrianInviteWalksToStall()
+        {
+            Pedestrian person = Object.FindAnyObjectByType<Pedestrians>().People[0];
+            runner.enabled = false;
+            finder.InviteRollOverride = 0f;
+            Teleport(person.transform.position + new Vector3(0f, 0f, -1f));
+            yield return null;
+            int count = runner.Simulation.Customers.Count;
+            yield return Press(v => input.InteractDown = v);
+            Assert.IsTrue(person.GoingToStall);
+            Assert.AreEqual(count + 1, runner.Simulation.Customers.Count);
+            float before = Vector3.Distance(person.transform.position, person.StallPoint);
+            yield return Hold(.3f);
+            Assert.Less(Vector3.Distance(person.transform.position, person.StallPoint), before);
+        }
+
+        [UnityTest]
+        public IEnumerator JumpRisesLandsAndCannotDoubleJump()
+        {
+            Teleport(new Vector3(-30f, player.transform.position.y, -6f));
+            yield return Hold(.1f);
+            float ground = player.transform.position.y;
+            input.Jump = true;
+            yield return null;
+            input.Jump = false;
+            yield return Hold(.2f);
+            float firstHeight = player.transform.position.y;
+            Assert.Greater(firstHeight, ground + .2f);
+            input.Jump = true;
+            yield return null;
+            input.Jump = false;
+            yield return Hold(.25f);
+            Assert.Less(player.transform.position.y, firstHeight + .35f, "공중에서 재점프하지 않는다");
+            yield return Hold(.8f);
+            Assert.That(player.transform.position.y, Is.EqualTo(ground).Within(.1f));
         }
     }
 }

@@ -71,7 +71,7 @@ else
   echo "의도한 변경이면 sh unity/tools/build-scene.sh --update-layout 으로 기준을 갱신한다." >&2
   exit 1
 fi
-for f in third-person first-person campus-front; do
+for f in third-person first-person campus-front entrance-refusal fish-cooking badge-comparison; do
   if [ -s "$SHOTS/$f.png" ]; then echo "PNG: $SHOTS/$f.png"; else echo "PNG 없음: $SHOTS/$f.png" >&2; exit 1; fi
 done
 

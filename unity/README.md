@@ -12,10 +12,10 @@ Unity **6000.3.29f1**, URP 17.3.0 프로젝트다(6000.3.1f1에서 같은 6000.3
 | `Assets/Scripts/Game` | `Unjungcheon.Game` — 입력 추상화(`IGameInput`), 사장님 이동, 카메라(3인칭/1인칭), 상호작용, HUD, `GameRunner`(Core 소유) |
 | `Assets/Scripts/Editor` | `Unjungcheon.EditorTools` — `ProjectSetup`(URP·후처리·입력 설정), `CampusSpec`(치수), `SceneBuilder`(1번 공간 생성), `ScreenshotCapture`, `SceneLayoutDump`, `WebGLBuild`, `Pipeline` |
 | `Assets/Shaders/SignText.shader` | 간판 글자용 언릿 셰이더 (깊이 검사 포함) |
-| `Assets/Tests/PlayMode` | 생성된 씬을 불러와 이동, 도로 건너가기 금지, 시점 전환, 카운터·호객 → Core 연결을 검사 |
+| `Assets/Tests/PlayMode` | 생성된 씬을 불러와 도로 건너기, 출입 제한, 행인 호객, 점프, 시점 전환과 Core 연결을 검사 |
 | `Assets/Generated`, `Assets/Scenes` | 생성기가 만든 재질·URP 에셋·씬. 손으로 고치지 않는다 |
 | `Game.Build` | 설치된 Unity 어셈블리로 라이선스 없이 하는 컴파일 검사 |
-| `tools/build-scene.sh` | 씬 생성 → 스크린샷 3장 → PlayMode 테스트를 한 번에 실행 |
+| `tools/build-scene.sh` | 씬 생성 → 스크린샷 5장 → PlayMode 테스트를 한 번에 실행 |
 | `tools/build-webgl.sh` | WebGL 빌드 → `Build/WebGL` |
 | `tools/deploy-pages.sh` | `Build/WebGL`을 `gh-pages` 브랜치 루트로 올린다 |
 
@@ -32,7 +32,7 @@ sh unity/tools/build-scene.sh
 
 출력:
 - 씬: `Assets/Scenes/Location1_Skala.unity` (빌드 설정에도 등록)
-- PNG 1920x1080: `Build/Screenshots/third-person.png`, `first-person.png`, `campus-front.png`
+- PNG 1920x1080: `Build/Screenshots/third-person.png`, `first-person.png`, `campus-front.png`, `entrance-refusal.png`, `fish-cooking.png`
 - 로그: `Build/Logs/build-scene.log`, `Build/Logs/playmode.log`, 결과 XML `Build/Logs/playmode-results.xml`
 - 배치 요약: `Build/Logs/scene-layout.txt`
 
@@ -58,7 +58,7 @@ sh unity/tools/deploy-pages.sh    # gh-pages 브랜치로 푸시 (공개 주소�
 - 기본 해상도 1600x900, 기본 로딩 템플릿을 쓰고 빌드 후 `index.html`에 스타일을 넣어 캔버스를 창 크기에 맞춘다. 출력 폴더에 `.nojekyll`을 만든다
 - 파일 하나가 100MB(Pages 제한)를 넘으면 빌드를 실패로 처리한다
 - `deploy-pages.sh`는 임시 git worktree에서 `Build/WebGL` 내용을 커밋해 `origin gh-pages`로 푸시한다. 브랜치가 없으면 orphan으로 만든다. 작성자는 저장소 git config 그대로다. 저장소 설정에서 Pages 소스를 `gh-pages` 브랜치 루트로 지정해야 한다
-- 저장 기능(Core `SaveData` → PlayerPrefs)은 아직 런타임에 저장 연결이 없어 이번 빌드에 넣지 않았다
+- Core 저장 상태에는 평판·눈총·임직원 친밀도·단체 주문이 포함된다. 런타임 PlayerPrefs 저장 연결은 아직 없다
 
 ## 설정 결정
 
@@ -101,7 +101,7 @@ dotnet build unity/Game.Build -warnaserror -p:BuildEditor=true   # Game + Editor
 | 별관 (본관 왼쪽 뒤) | 70 × 25m, 8층 × 4m | -96 ~ -26 | 46 ~ 71 |
 | 포장마차 (정면이 캠퍼스) | 3.2 × 1.5m | 2.4 ~ 5.6 | -7.65 ~ -6.15 |
 | 사장님 시작 (포장마차 안쪽) | | 4 | -8.35 |
-| 사장님 이동 영역 | | -40 ~ 40 | -8.72 ~ -4.53 |
+| 사장님 이동 영역 | | -60 ~ 60 | 이쪽 보도·도로·건너편 광장·건물 주변 |
 
 ```text
  Z
@@ -122,7 +122,9 @@ dotnet build unity/Game.Build -warnaserror -p:BuildEditor=true   # Game + Editor
 
 ### 조작
 
-WASD/방향키로 걷고(2.2m/s) Shift로 달린다(3.4m/s). V로 3인칭 경영 뷰와 1인칭 사장 시점(눈높이 1.6m, 마우스 시선, 상하 ±70°)을 바꾼다. 1인칭에서는 몸을 숨기고 시선 방향 기준으로 걷는다. E/Space로 가까운 지점을 쓴다: 카운터 → `ServeNow`, 호객 → `Hawk`, 붕어빵 틀은 자리 표시다(홀드 조리는 U3). HUD는 날짜, 남은 시간, 돈, 상호작용 안내를 값이 바뀔 때만 다시 쓴다.
+WASD/방향키로 걷고(2.2m/s) Shift로 달린다(3.4m/s). Space로 약 1m 점프한다. V로 3인칭 경영 뷰와 1인칭 사장 시점(눈높이 1.6m, 마우스 시선, 상하 ±70°)을 바꾼다. 1인칭에서는 몸을 숨기고 시선 방향 기준으로 걷는다. E로 가까운 지점을 쓴다: 카운터 → `ServeNow`, 포장마차 앞 외치기 → `Hawk`, 행인 호객 → `Invite`, 경비 부스 대화, 층 안내판 읽기. 붕어빵 틀에서는 E를 꾹 눌러 아래 반죽·팥·위 반죽을 넣고, 굽는 중 E로 꺼낸다. 1인칭에서는 마우스 왼쪽 버튼도 쓴다. 조작 중인 틀 하나의 단계·게이지는 화면 아래 패널에 나오고, 틀 위에는 작은 상태 점(회색 빔·노랑 굽는 중·초록 깜빡임 꺼낼 때·빨강 탐)만 있다. 임직원 단체 주문 제안은 F로 수락, Q로 거절한다(E와 별개다). 수락하면 카운터 옆에 주문 상자가 생기고 직접 구운 붕어빵만 먼저 담긴다. F를 한 번 더 누르면 진열대 재고를 상자로 옮긴다. 상자와 진열대를 합쳐 수량이 되면 카운터 E가 "단체 주문 전달"이 된다. 도로는 어디서든 건널 수 있고 건물 출입은 막힌다. HUD는 날짜, 남은 시간, 돈, 상호작용 안내를 값이 바뀔 때만 다시 쓴다.
+
+화면 위 튜토리얼 카드는 이동 → 붕어빵 굽기 → 카운터 → 시점 전환 → 행인 호객 순으로 행동하면 넘어간다. Esc로 건너뛰고 F1로 처음부터 다시 본다. 진행은 PlayerPrefs에 저장된다.
 
 ---
 
