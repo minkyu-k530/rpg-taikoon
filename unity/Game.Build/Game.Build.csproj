@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <UnityRoot Condition="'$(UnityRoot)' == ''">/Applications/Unity/Hub/Editor/6000.3.29f1/Unity.app/Contents</UnityRoot>
+    <UnityManaged>$(UnityRoot)/Resources/Scripting/Managed</UnityManaged>
+    <UnityTemplateAssemblies Condition="'$(UnityTemplateAssemblies)' == ''">$(UnityRoot)/Resources/PackageManager/ProjectTemplates/libcache/com.unity.template.3d-cross-platform-17.0.14/ScriptAssemblies</UnityTemplateAssemblies>
+    <DefineConstants Condition="'$(InputMode)' == 'Legacy'">ENABLE_LEGACY_INPUT_MANAGER</DefineConstants>
+    <DefineConstants Condition="'$(InputMode)' != 'Legacy'">ENABLE_INPUT_SYSTEM</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Assets/Scripts/Game/**/*.cs" />
+    <Compile Include="../Assets/Scripts/Editor/**/*.cs" Condition="'$(BuildEditor)' == 'true'" />
+    <ProjectReference Include="../Core.Build/Core.Build.csproj" />
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.UIModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.TextRenderingModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AudioModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.AudioModule.dll</HintPath></Reference>
+    <Reference Include="UnityEditor" Condition="'$(BuildEditor)' == 'true'"><HintPath>$(UnityManaged)/UnityEditor.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.PhysicsModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.InputLegacyModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.IMGUIModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.ImageConversionModule.dll</HintPath></Reference>
+    <Reference Include="Unity.InputSystem"><HintPath>$(UnityTemplateAssemblies)/Unity.InputSystem.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(UnityTemplateAssemblies)/UnityEngine.UI.dll</HintPath></Reference>
+    <Reference Include="Unity.RenderPipelines.Universal.Runtime" Condition="'$(BuildEditor)' == 'true'"><HintPath>$(UnityTemplateAssemblies)/Unity.RenderPipelines.Universal.Runtime.dll</HintPath></Reference>
+    <Reference Include="Unity.RenderPipelines.Core.Runtime" Condition="'$(BuildEditor)' == 'true'"><HintPath>$(UnityTemplateAssemblies)/Unity.RenderPipelines.Core.Runtime.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>
