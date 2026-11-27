@@ -14,10 +14,26 @@ namespace Unjungcheon.Core
     public enum Weather { Clear, Snow, Rain }
     public enum Menu { Fish, Oden, Tako, Tteok }
     public enum CustomerPhase { Browse, Queue, Serve, Leave }
+    public enum CustomerKind { General, Employee, Trainee }
     public enum TakoPhase { Empty, Pouring, Octopus, Roll1, Roll2, Sauce, Complete }
     public enum FishPhase { Empty, Bottom, RedBean, Top, Baking }
     public enum Location { Skala, PangyoStation }
-    public enum SimEventKind { BakeComplete, Sale, Combo, FavorStage, TakoComplete, LocationUnlocked, HomeReached }
+    public enum SimEventKind { BakeComplete, Sale, Combo, FavorStage, TakoComplete, LocationUnlocked, HomeReached, CustomerArrived, GroupOffered, GroupSucceeded, GroupFailed, GuardWarning }
+
+    public sealed class GroupOrderState
+    {
+        public int quantity;
+        public bool accepted;
+        public double deadline;
+        public QualityScore[] box = new QualityScore[0];
+        public int boxCount;
+        public GroupOrderState Copy()
+        {
+            var copy = (GroupOrderState)MemberwiseClone();
+            copy.box = Array.ConvertAll(box ?? new QualityScore[0], score => score?.Copy());
+            return copy;
+        }
+    }
 
     public sealed class QualityScore
     {
@@ -65,6 +81,7 @@ namespace Unjungcheon.Core
     {
         public int id, residentIndex, quantity;
         public Menu menu;
+        public CustomerKind kind;
         public CustomerPhase phase;
         public double timer, patience;
         public bool servedNow;
@@ -80,7 +97,7 @@ namespace Unjungcheon.Core
         public int[] upgrades, visits;
         public QualityScore[] fishTray;
         public double dayTime, clock, spawnTimer, tteokTime;
-        public double hawkUntil, hawkReady, takoReady, odenBoostUntil, odenReady, stirReady;
+        public double hawkUntil, hawkReady, inviteReady, takoReady, odenBoostUntil, odenReady, stirReady;
         public double[] talkReady;
         public int[] talkCount;
         public Weather weather, tomorrow;
@@ -91,6 +108,9 @@ namespace Unjungcheon.Core
         public DayReport stats;
         public int activeLocation;
         public bool stationUnlocked;
+        public int reputation, employeeLoyalty, glares;
+        public double guardBanUntil, glareDecayAt;
+        public GroupOrderState groupOrder;
 
         public DayStartData Copy() => new DayStartData {
             randomState = randomState, day = day, money = money, nextCustomerId = nextCustomerId, combo = combo,
@@ -98,12 +118,14 @@ namespace Unjungcheon.Core
             takoBalls = takoBalls, upgrades = (int[])upgrades.Clone(), visits = (int[])visits.Clone(),
             fishTray = Array.ConvertAll(fishTray, x => x.Copy()), dayTime = dayTime, clock = clock,
             spawnTimer = spawnTimer, tteokTime = tteokTime, hawkUntil = hawkUntil, hawkReady = hawkReady,
-            takoReady = takoReady, odenBoostUntil = odenBoostUntil, odenReady = odenReady, stirReady = stirReady,
+            inviteReady = inviteReady, takoReady = takoReady, odenBoostUntil = odenBoostUntil, odenReady = odenReady, stirReady = stirReady,
             talkReady = (double[])talkReady.Clone(), talkCount = (int[])talkCount.Clone(), weather = weather,
             tomorrow = tomorrow, open = open, tteokCooking = tteokCooking,
             molds = Array.ConvertAll(molds, x => x.Copy()), tako = tako.Copy(),
             customers = Array.ConvertAll(customers, x => x.Copy()), stats = stats.Copy(),
-            activeLocation = activeLocation, stationUnlocked = stationUnlocked
+            activeLocation = activeLocation, stationUnlocked = stationUnlocked,
+            reputation = reputation, employeeLoyalty = employeeLoyalty, glares = glares,
+            guardBanUntil = guardBanUntil, glareDecayAt = glareDecayAt, groupOrder = groupOrder?.Copy()
         };
     }
 

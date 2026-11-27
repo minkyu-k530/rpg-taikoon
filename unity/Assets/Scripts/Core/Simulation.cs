@@ -35,14 +35,22 @@ namespace Unjungcheon.Core
         public int HomeFund { get; private set; }
         public bool HomeReached { get; private set; }
         public double SavingsRate { get; private set; } = Balance.DefaultSavingsRate;
+        public int Reputation { get; private set; } = 50;
+        public int EmployeeLoyalty { get; private set; }
+        public int Glares { get; private set; }
+        public double GuardBanUntil { get; private set; }
+        public GroupOrderState GroupOrder { get; private set; }
+        double glareDecayAt;
+        public bool CampusInviteBanned => Clock < GuardBanUntil;
         public double HawkReady => hawkReady;
+        public double InviteReady => inviteReady;
         public double OdenReady => odenReady;
         public double StirReady => stirReady;
         public int FrontCustomerId
         {
             get { foreach (CustomerState c in Customers) if (c.phase == CustomerPhase.Serve) return c.id; return -1; }
         }
-        double spawnTimer, tteokTime, hawkUntil, hawkReady, odenBoostUntil, odenReady, stirReady;
+        double spawnTimer, tteokTime, hawkUntil, hawkReady, inviteReady, odenBoostUntil, odenReady, stirReady;
         double takoReady;
         double[] talkReady = new double[20];
         int[] talkCount = new int[20];
@@ -126,6 +134,16 @@ namespace Unjungcheon.Core
                 Clock += step; DayTime += step;
                 UpdateMolds(step); UpdateTako(step); UpdateTteok(step);
                 UpdateSpawn(step); UpdateCustomers(step);
+                if (Glares > 0 && Clock >= glareDecayAt) { Glares--; glareDecayAt = Clock + Balance.GlareDecayTime; }
+                if (GroupOrder != null && Clock >= GroupOrder.deadline) {
+                    if (GroupOrder.accepted)
+                    {
+                        ReturnGroupBox();
+                        EmployeeLoyalty = Math.Max(0, EmployeeLoyalty - 5);
+                        Emit(SimEventKind.GroupFailed);
+                    }
+                    GroupOrder = null;
+                }
                 if (DayTime + 1e-8 >= Balance.DayLength) CloseDay();
             }
         }
@@ -199,7 +217,9 @@ namespace Unjungcheon.Core
         void FinishFish(int index, QualityScore score)
         {
             MoldState m = Molds[index];
-            FishTray.Add(score);
+            if (!m.automatic && GroupOrder != null && GroupOrder.accepted && GroupOrder.boxCount < GroupOrder.quantity)
+                GroupOrder.box[GroupOrder.boxCount++] = score;
+            else FishTray.Add(score);
             Emit(SimEventKind.BakeComplete, index, score.Total);
             m.phase = FishPhase.Empty; m.time = 0; m.holding = false; m.cooldown = Rand(Balance.FishRestartMin, Balance.FishRestartMax);
         }
@@ -301,6 +321,32 @@ namespace Unjungcheon.Core
             hawkReady = Clock + Balance.HawkCooldown;
             return true;
         }
+        public bool CanInvite(bool campus = false) => Open && Clock >= inviteReady && (!campus || !CampusInviteBanned);
+        public bool CanInviteMore()
+        {
+            if (Customers.Count >= Balance.MaxCustomersOnSite) return false;
+            int queued = 0;
+            foreach (CustomerState c in Customers)
+                if (c.phase == CustomerPhase.Queue || c.phase == CustomerPhase.Serve) queued++;
+            return queued < Balance.QueueMax;
+        }
+        public void RecordInviteFailure()
+        {
+            Glares++;
+            if (Glares == 1) glareDecayAt = Clock + Balance.GlareDecayTime;
+            if (Glares >= 3) { Glares = 0; GuardBanUntil = Clock + Balance.GuardBanTime; Reputation = Math.Max(0, Reputation - 5); Emit(SimEventKind.GuardWarning); }
+        }
+        public bool Invite(CustomerKind kind = CustomerKind.General, bool campus = false)
+        {
+            if (!CanInvite(campus) || !CanInviteMore()) return false;
+            inviteReady = Clock + Balance.InviteCooldown;
+            int resident = (int)(random.Next() * Visits.Length);
+            var customer = new CustomerState { id = nextCustomerId++, residentIndex = resident, quantity = 1, kind = kind,
+                menu = Menu.Fish, phase = CustomerPhase.Queue, timer = Balance.BrowseTime, patience = Balance.Patience };
+            Customers.Add(customer);
+            Emit(SimEventKind.CustomerArrived, customer.id);
+            return true;
+        }
         public bool Talk(string residentId)
         {
             int resident = Array.IndexOf(Balance.ResidentIds, residentId);
@@ -315,6 +361,7 @@ namespace Unjungcheon.Core
             spawnTimer -= dt;
             if (spawnTimer > 0) return;
             double rate = (1 + Balance.SignSpawnBonus * UpgradeLevel("sign") + Balance.PlanterSpawnBonus * UpgradeLevel("planter") + Balance.LightsSpawnBonus * UpgradeLevel("lights")) * Balance.WeatherSpawn[(int)Weather];
+            rate *= 1 + (Reputation - 50) * .001;
             rate *= ActiveLocation == Location.Skala ? Balance.SkalaSpawnMultiplier : Balance.StationSpawnMultiplier;
             double fraction = DayTime / Balance.DayLength;
             bool peak = ActiveLocation == Location.Skala ? fraction >= Balance.SkalaPeakStart && fraction <= Balance.SkalaPeakEnd : fraction >= Balance.StationPeakStart && fraction <= Balance.StationPeakEnd;
@@ -324,13 +371,71 @@ namespace Unjungcheon.Core
             if (Customers.Count >= Balance.MaxCustomersOnSite) return;
             int resident = (int)(random.Next() * Visits.Length);
             double buy = (Balance.BuyChance + Balance.HeaterBuyBonus * UpgradeLevel("heater") + Balance.RadioBuyBonus * UpgradeLevel("radio") + (resident < Balance.NamedRegularCount ? FavorStage(resident) * Balance.RegularStageBuyBonus : 0)) * Balance.WeatherBuy[(int)Weather];
+            buy *= 1 + (Reputation - 50) * .001;
             double roll = random.Next();
             if (roll > buy + Balance.BrowseChance) return;
             Menu menu = Menu.Fish;
             if (UpgradeLevel("tteok") > 0 && random.Next() < Balance.TteokPickChance) menu = Menu.Tteok;
             else if (UpgradeLevel("tako") > 0 && random.Next() < Balance.TakoPickChance) menu = Menu.Tako;
             else if (UpgradeLevel("oden") > 0 && random.Next() < Balance.OdenPickChance) menu = Menu.Oden;
-            Customers.Add(new CustomerState { id = nextCustomerId++, residentIndex = resident, quantity = 1, menu = menu, phase = roll < buy ? CustomerPhase.Queue : CustomerPhase.Browse, timer = Balance.BrowseTime, patience = Balance.Patience });
+            var customer = new CustomerState { id = nextCustomerId++, residentIndex = resident, quantity = 1, kind = RollCustomerKind(nextCustomerId - 1), menu = menu, phase = roll < buy ? CustomerPhase.Queue : CustomerPhase.Browse, timer = Balance.BrowseTime, patience = Balance.Patience };
+            Customers.Add(customer);
+            Emit(SimEventKind.CustomerArrived, customer.id);
+        }
+        public CustomerKind RollCustomerKind(int id)
+        {
+            double roll = ((uint)id * 2654435761u % 1000) / 1000.0;
+            double employeeShare = Math.Min(.45, Balance.EmployeeShare + EmployeeLoyalty * .001);
+            return roll < employeeShare ? CustomerKind.Employee : roll < employeeShare + Balance.TraineeShare ? CustomerKind.Trainee : CustomerKind.General;
+        }
+        public bool OfferGroupOrder(CustomerKind kind, double roll, int quantity)
+        {
+            if (kind != CustomerKind.Employee || GroupOrder != null || roll >= Balance.GroupChance + EmployeeLoyalty * .0004) return false;
+            int min = Molds.Count <= 2 ? 6 : Molds.Count <= 4 ? 8 : 10;
+            int max = Molds.Count <= 2 ? 9 : Molds.Count <= 4 ? 12 : 16;
+            GroupOrder = new GroupOrderState { quantity = min + Math.Abs(quantity - Balance.GroupMin) % (max - min + 1), deadline = Clock + Balance.GroupOfferTime };
+            Emit(SimEventKind.GroupOffered, 0, GroupOrder.quantity);
+            return true;
+        }
+        public bool AcceptGroupOrder()
+        {
+            if (GroupOrder == null || GroupOrder.accepted || Clock >= GroupOrder.deadline) return false;
+            GroupOrder.accepted = true;
+            GroupOrder.box = new QualityScore[GroupOrder.quantity];
+            GroupOrder.deadline = Clock + Balance.GroupBaseDuration + GroupOrder.quantity * Balance.GroupSecondsPerFish;
+            return true;
+        }
+        // 카운터 E로 전달할 수 있는지: 상자와 진열대 재고를 합쳐 수량 이상이다.
+        public bool CanDeliverGroupOrder => GroupOrder != null && GroupOrder.accepted && Clock < GroupOrder.deadline && GroupOrder.boxCount + FishTray.Count >= GroupOrder.quantity;
+        public bool MoveTrayToGroupBox()
+        {
+            if (GroupOrder == null || !GroupOrder.accepted || GroupOrder.boxCount >= GroupOrder.quantity || FishTray.Count == 0) return false;
+            int move = Math.Min(FishTray.Count, GroupOrder.quantity - GroupOrder.boxCount);
+            for (int i = 0; i < move; i++) GroupOrder.box[GroupOrder.boxCount++] = FishTray[i];
+            FishTray.RemoveRange(0, move);
+            return true;
+        }
+        void ReturnGroupBox()
+        {
+            for (int i = 0; i < GroupOrder.boxCount; i++) FishTray.Add(GroupOrder.box[i]);
+        }
+        public bool DeclineGroupOrder()
+        {
+            if (GroupOrder == null || GroupOrder.accepted) return false;
+            GroupOrder = null; return true;
+        }
+        public bool DeliverGroupOrder()
+        {
+            if (GroupOrder == null || !GroupOrder.accepted || Clock >= GroupOrder.deadline || GroupOrder.boxCount < GroupOrder.quantity) return false;
+            int qty = GroupOrder.quantity, price = 0;
+            for (int i = 0; i < qty; i++) price += GroupOrder.box[i].Price(Balance.FishPrice);
+            price = (int)Math.Round(price * (1 + Balance.GroupBonus), MidpointRounding.AwayFromZero);
+            int cost = qty * Balance.FishCost;
+            Money += price - cost; Stats.revenue += price; Stats.cost += cost; Stats.sold += qty; Stats.customers++;
+            EmployeeLoyalty = Math.Min(100, EmployeeLoyalty + 10);
+            Reputation = Math.Min(100, Reputation + 2);
+            GroupOrder = null; Emit(SimEventKind.GroupSucceeded, 0, price);
+            return true;
         }
         void UpdateCustomers(double dt)
         {
@@ -396,12 +501,18 @@ namespace Unjungcheon.Core
                     price = (int)(Balance.TakoPrice * (good ? Balance.GoodMultiplier : 1));
                     cost = Balance.TakoCost; break;
             }
-            int tip = immediate ? Balance.ServeTip : 0;
+            int tip = immediate ? Balance.ServeTip + (c.kind == CustomerKind.Employee ? Math.Min(100, EmployeeLoyalty * 2) : 0) : 0;
             c.servedNow = immediate;
             Money += price - cost + tip;
             Stats.revenue += price + tip; Stats.cost += cost; Stats.sold++; Stats.customers++;
             Emit(SimEventKind.Sale, c.id, price + tip);
             AddVisit(c.residentIndex);
+            if (Stats.sold % 10 == 0) Reputation = Math.Min(100, Reputation + 1);
+            if (c.kind == CustomerKind.Employee)
+            {
+                double offerRoll = ((uint)c.id * 2246822519u % 10000) / 10000.0;
+                OfferGroupOrder(c.kind, offerRoll, Balance.GroupMin + c.id % (Balance.GroupMax - Balance.GroupMin + 1));
+            }
             return true;
         }
         void AddVisit(int resident)
@@ -457,8 +568,8 @@ namespace Unjungcheon.Core
             Stats = new DayReport { day = Day }; Report = null;
             Customers.Clear(); FishTray.Clear(); TteokStock = 0;
             tteokCooking = false; tteokTime = 0; spawnTimer = 0;
-            hawkUntil = 0; hawkReady = 0; odenBoostUntil = 0; odenReady = 0;
-            stirReady = 0; takoReady = 0; Combo = 0;
+            hawkUntil = 0; hawkReady = 0; inviteReady = 0; odenBoostUntil = 0; odenReady = 0;
+            stirReady = 0; takoReady = 0; Combo = 0; Glares = 0; GuardBanUntil = 0; GroupOrder = null;
             Array.Clear(talkReady, 0, talkReady.Length);
             Array.Clear(talkCount, 0, talkCount.Length);
             Molds.Clear(); ResetMolds(); Tako = new TakoState(); dayStart = null;
@@ -483,13 +594,14 @@ namespace Unjungcheon.Core
                 odenStock = OdenStock, tteokStock = TteokStock, takoStock = TakoStock, takoGoodStock = TakoGoodStock, takoBalls = takoBalls,
                 upgrades = (int[])Upgrades.Clone(), visits = (int[])Visits.Clone(), fishTray = FishTray.ConvertAll(x => x.Copy()).ToArray(),
                 spawnTimer = spawnTimer, tteokTime = tteokTime, tteokCooking = tteokCooking,
-                offlineHourlyProfit = OfflineHourlyProfit, hawkUntil = hawkUntil, hawkReady = hawkReady, takoReady = takoReady,
+                offlineHourlyProfit = OfflineHourlyProfit, hawkUntil = hawkUntil, hawkReady = hawkReady, inviteReady = inviteReady, takoReady = takoReady,
                 odenBoostUntil = odenBoostUntil, odenReady = odenReady, stirReady = stirReady,
                 talkReady = (double[])talkReady.Clone(), talkCount = (int[])talkCount.Clone(),
                 molds = Molds.ConvertAll(m => m.Copy()).ToArray(), tako = Tako.Copy(),
                 customers = Customers.ConvertAll(c => c.Copy()).ToArray(), stats = Stats.Copy(), report = Report?.Copy(), dayStart = dayStart?.Copy(),
                 activeLocation = (int)ActiveLocation, stationUnlocked = StationUnlocked, cumulativeProfit = CumulativeProfit,
-                homeFund = HomeFund, homeReached = HomeReached, savingsRate = SavingsRate
+                homeFund = HomeFund, homeReached = HomeReached, savingsRate = SavingsRate,
+                reputation = Reputation, employeeLoyalty = EmployeeLoyalty, glares = Glares, guardBanUntil = GuardBanUntil, glareDecayAt = glareDecayAt, groupOrder = GroupOrder?.Copy()
             };
         }
         public void Restore(SaveData s)
@@ -510,12 +622,14 @@ namespace Unjungcheon.Core
             foreach (MoldState m in s.molds) Molds.Add(m.Copy());
             Tako = s.tako.Copy(); Customers.Clear(); foreach (CustomerState c in s.customers) Customers.Add(c.Copy());
             spawnTimer = s.spawnTimer; tteokTime = s.tteokTime; tteokCooking = s.tteokCooking;
-            hawkUntil = s.hawkUntil; hawkReady = s.hawkReady;
+            hawkUntil = s.hawkUntil; hawkReady = s.hawkReady; inviteReady = s.inviteReady;
             takoReady = s.takoReady;
             odenBoostUntil = s.odenBoostUntil; odenReady = s.odenReady; stirReady = s.stirReady;
             talkReady = (double[])s.talkReady.Clone(); talkCount = (int[])s.talkCount.Clone();
             Stats = s.stats.Copy();
             ActiveLocation = (Location)s.activeLocation; StationUnlocked = s.stationUnlocked;
+            Reputation = s.reputation == 0 && s.day <= 1 ? 50 : s.reputation; EmployeeLoyalty = s.employeeLoyalty; Glares = s.glares;
+            GuardBanUntil = s.guardBanUntil; glareDecayAt = s.glareDecayAt; GroupOrder = s.groupOrder?.Copy();
         }
     }
 }

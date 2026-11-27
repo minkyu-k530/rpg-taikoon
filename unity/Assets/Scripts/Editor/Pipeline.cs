@@ -24,6 +24,12 @@ namespace Unjungcheon.EditorTools
             }
         }
 
+        public static void CaptureOnly()
+        {
+            try { ScreenshotCapture.Capture(); EditorApplication.Exit(0); }
+            catch (System.Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+        }
+
         // -buildTarget WebGL -executeMethod Unjungcheon.EditorTools.Pipeline.BuildWebGL
         public static void BuildWebGL()
         {

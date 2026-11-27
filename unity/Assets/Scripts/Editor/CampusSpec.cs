@@ -56,9 +56,6 @@ namespace Unjungcheon.EditorTools
         // 사장님
         public const float PlayerStartX = 4f, PlayerStartZ = -8.35f;  // 포장마차 안쪽(사장 자리)
         public const float PlayerRadius = 0.28f, PlayerHeight = 1.75f;
-        public const float WalkMinX = -40f, WalkMaxX = 40f;
-        public const float WalkMinZ = NearWalkBackZ + PlayerRadius;                // -8.72
-        public const float WalkMaxZ = NearRoadEdgeZ - CurbWidth - PlayerRadius;    // -4.53, 도로로 못 나간다
 
         // 상호작용 지점 (포장마차 기준 상대 위치)
         public const float InteractRadius = 1.1f;
