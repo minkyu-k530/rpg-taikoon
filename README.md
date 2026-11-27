@@ -9,6 +9,7 @@
 | [`docs/DELIVERY.md`](docs/DELIVERY.md) | 배달 원정 설계서 — 두 번째 플레이 모드 |
 | [`docs/DEVLOG.md`](docs/DEVLOG.md) | 브랜치별 개발 일지 — 결정과 **버린 선택지**, 실측 수치 |
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | 에러·버그 기록 |
+| [`docs/ENGINE.md`](docs/ENGINE.md) | 스킨드 캐릭터 엔진 검증 결과 |
 
 ## 목표
 
