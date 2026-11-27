@@ -12,7 +12,7 @@ import { pickHint, type Hint } from '../game/tutorial';
 
 const won = (n: number) => n.toLocaleString('ko-KR') + '원';
 
-export function HUD() {
+export function HUD({ playerPrompt }: { playerPrompt: string | null }) {
   const snap = useSnapshot();
   const [bookOpen, setBookOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -22,6 +22,7 @@ export function HUD() {
   const settlement = !snap.open && !!snap.report && !snap.choosingEnding && !snap.ending;
   const hint = pickHint({
     open: snap.open,
+    day: snap.day,
     inScene: !!snap.scene,
     delivering: snap.delivering,
     deliveryResult: !!snap.deliveryResult,
@@ -61,6 +62,7 @@ export function HUD() {
       </div>
 
       <div className="hud-bottom">
+        {playerPrompt && <p className="player-prompt">{playerPrompt}</p>}
         <div className="molds">
           {snap.molds.map((m, i) => {
             const inWindow = m.baking && !m.flipped && m.t >= flipA && m.t < flipB;

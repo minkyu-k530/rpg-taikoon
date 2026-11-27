@@ -651,6 +651,23 @@ canvas {
   text-align: center;
 }
 
+.player-prompt {
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 178, 87, 0.45);
+  color: var(--warm);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.coach-at-move {
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 190px);
+  transform: translateX(-50%);
+}
+
 /* ---------------------------------------------------------------- 정산 */
 
 .overlay {
