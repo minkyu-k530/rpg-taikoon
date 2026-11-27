@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { audio } from '../game/audio';
+import { Coach } from './Coach';
 import { Cutscene } from './Cutscene';
 import { Ending } from './Ending';
 import { CONFIG, upgradeCost, type UpgradeKind } from '../game/config';
@@ -7,6 +8,7 @@ import type { DeliveryOffer, DeliveryResult } from '../game/sim';
 import { favorStage, FAVOR_STAGES, REGULARS, unlockedLines } from '../game/residents';
 import { WEATHER } from '../game/weather';
 import { sim, useSnapshot } from '../game/useSim';
+import { pickHint, type Hint } from '../game/tutorial';
 
 const won = (n: number) => n.toLocaleString('ko-KR') + '원';
 
@@ -17,13 +19,30 @@ export function HUD() {
   const [flipA, flipB] = CONFIG.bake.flipWindow;
 
   const known = REGULARS.filter((r) => (snap.visits[r.id] ?? 0) >= FAVOR_STAGES[1].visits).length;
+  const settlement = !snap.open && !!snap.report && !snap.choosingEnding && !snap.ending;
+  const hint = pickHint({
+    open: snap.open,
+    inScene: !!snap.scene,
+    delivering: snap.delivering,
+    deliveryResult: !!snap.deliveryResult,
+    ending: snap.choosingEnding || !!snap.ending,
+    overlayOpen: bookOpen || settingsOpen,
+    settlement,
+    anyMoldInWindow: snap.molds.some((m) => m.baking && !m.flipped && m.t >= flipA && m.t < flipB),
+    timeLeftRatio: snap.timeLeft / CONFIG.dayLength,
+    knownRegulars: known,
+    hasOffer: !!snap.deliveryOffer,
+  }, snap.seenHints);
+  const guidedMold = hint?.id === 'flip'
+    ? snap.molds.findIndex((m) => m.baking && !m.flipped && m.t >= flipA && m.t < flipB)
+    : -1;
 
   return (
     <>
       <div className="hud-top">
         <div className="chip">
           <span className="chip-label">{snap.day}일차</span>
-          <span className="chip-time">{Math.ceil(snap.timeLeft)}초</span>
+          <span className={`chip-time ${hint?.id === 'clock' ? 'coach-target' : ''}`}>{Math.ceil(snap.timeLeft)}초</span>
           <span className="chip-weather">{WEATHER[snap.weather].label}</span>
           {snap.nightsLeft !== null && <span className="chip-nights">남은 밤 {snap.nightsLeft}</span>}
         </div>
@@ -31,7 +50,7 @@ export function HUD() {
         <button className="chip icon-btn" onClick={() => setSettingsOpen(true)}>
           설정
         </button>
-        <button className="chip book-btn" onClick={() => setBookOpen(true)}>
+        <button className={`chip book-btn ${hint?.id === 'book' ? 'coach-target' : ''}`} onClick={() => { if (known > 0) sim.markHint('book'); setBookOpen(true); }}>
           단골 {known}/{REGULARS.length}
         </button>
       </div>
@@ -49,8 +68,8 @@ export function HUD() {
             return (
               <button
                 key={i}
-                className={`mold ${inWindow ? 'ready' : ''} ${m.burnt ? 'burnt' : ''}`}
-                onClick={() => sim.flip(i)}
+                className={`mold ${inWindow ? 'ready' : ''} ${m.burnt ? 'burnt' : ''} ${i === guidedMold ? 'coach-target' : ''}`}
+                onClick={() => { if (sim.flip(i)) sim.markHint('flip'); }}
               >
                 <span className="mold-fill" style={{ height: `${progress * 100}%` }} />
                 <span className="mold-text">
@@ -63,13 +82,14 @@ export function HUD() {
         <p className="hint">노랗게 깜빡일 때 누르면 제값에 팔린다. 놓쳐도 바삭한 붕어빵으로 팔린다.</p>
       </div>
 
-      {snap.deliveryOffer && !snap.deliveryResult && <DeliveryOfferCard offer={snap.deliveryOffer} />}
+      {snap.deliveryOffer && !snap.deliveryResult && <DeliveryOfferCard offer={snap.deliveryOffer} highlighted={hint?.id === 'delivery'} />}
       {snap.deliveryResult && <DeliveryResultPanel result={snap.deliveryResult} />}
       {snap.scene && !snap.deliveryResult && <Cutscene scene={snap.scene} />}
       {bookOpen && <Book onClose={() => setBookOpen(false)} />}
-      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} hintsEnabled={!snap.seenHints.off} />}
       {(snap.choosingEnding || snap.ending) && <Ending />}
-      {!snap.open && snap.report && !snap.choosingEnding && !snap.ending && <Settlement />}
+      {settlement && <Settlement upgradeHint={hint?.id === 'upgrade' ? hint : null} />}
+      <Coach hint={hint?.id === 'upgrade' ? null : hint} />
     </>
   );
 }
@@ -78,17 +98,17 @@ export function HUD() {
  * 손님의 배달 부탁.
  * 화면을 막지 않는다 — 그냥 두면 사라지고, 그래도 아무 일도 일어나지 않는다.
  */
-function DeliveryOfferCard({ offer }: { offer: DeliveryOffer }) {
+function DeliveryOfferCard({ offer, highlighted }: { offer: DeliveryOffer; highlighted: boolean }) {
   const blocked = !sim.canDeliver();
   return (
-    <div className={`offer ${offer.special ? 'special' : ''}`}>
+    <div className={`offer ${offer.special ? 'special' : ''} ${highlighted ? 'coach-target' : ''}`}>
       <span className="offer-who">{offer.clientName}</span>
       <p className="offer-line">“{offer.line}”</p>
       <div className="offer-actions">
-        <button className="offer-no" onClick={() => sim.declineDelivery()}>
+        <button className="offer-no" onClick={() => { sim.declineDelivery(); sim.markHint('delivery'); }}>
           다음에요
         </button>
-        <button className="offer-yes" disabled={blocked} onClick={() => sim.acceptDelivery()}>
+        <button className="offer-yes" disabled={blocked} onClick={() => { if (sim.acceptDelivery()) sim.markHint('delivery'); }}>
           {blocked ? '진열대가 비었다' : '갖다드리겠습니다'}
         </button>
       </div>
@@ -146,8 +166,8 @@ function DeliveryResultPanel({ result }: { result: DeliveryResult }) {
   );
 }
 
-/** 설정. 소리와 저장 초기화만 있다 */
-function Settings({ onClose }: { onClose: () => void }) {
+/** 설정. 소리, 처음 안내, 저장 초기화 */
+function Settings({ onClose, hintsEnabled }: { onClose: () => void; hintsEnabled: boolean }) {
   const [muted, setMuted] = useState(audio.muted);
   const [confirming, setConfirming] = useState(false);
 
@@ -167,6 +187,11 @@ function Settings({ onClose }: { onClose: () => void }) {
             <span className="u-name">소리</span>
             <span className="u-desc">물소리, 기름 끓는 소리, 눈 오는 날의 먹먹함</span>
             <span className="u-cost">{muted ? '꺼짐' : '켜짐'}</span>
+          </button>
+          <button className="upgrade" onClick={() => sim.setHintsEnabled(!hintsEnabled)}>
+            <span className="u-name">처음 안내</span>
+            <span className="u-desc">기능을 처음 만날 때 한 번씩 알려 준다</span>
+            <span className="u-cost">{hintsEnabled ? '켜짐' : '꺼짐'}</span>
           </button>
         </div>
 
@@ -252,7 +277,7 @@ function Book({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Settlement() {
+function Settlement({ upgradeHint }: { upgradeHint: Hint | null }) {
   const snap = useSnapshot(6);
   const r = snap.report!;
   const kinds: UpgradeKind[] = ['mold', 'sign', 'heater', 'oden', 'tteok', 'helper'];
@@ -310,7 +335,8 @@ function Settlement() {
           </div>
         )}
 
-        <h3>가게 키우기</h3>
+        <Coach hint={upgradeHint} />
+        <h3 className={upgradeHint ? 'coach-target' : ''}>가게 키우기</h3>
         <div className="upgrades">
           {kinds.map((k) => {
             const u = CONFIG.upgrades[k];
@@ -321,7 +347,7 @@ function Settlement() {
             const locked = r.day < u.unlockDay;
             const afford = !locked && !maxed && snap.money >= cost;
             return (
-              <button key={k} className="upgrade" disabled={!afford} onClick={() => sim.buy(k)}>
+              <button key={k} className="upgrade" disabled={!afford} onClick={() => { if (sim.buy(k)) sim.markHint('upgrade'); }}>
                 <span className="u-name">
                   {u.label} {u.max > 1 && `Lv.${level}`}
                 </span>

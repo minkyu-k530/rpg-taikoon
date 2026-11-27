@@ -14,6 +14,7 @@ export interface SaveData {
   visits: Record<string, number>;
   /** 이미 본 컷신 id */
   seenScenes: Record<string, true>;
+  seenHints?: Record<string, true>;
   /** 누적 순이익과 본 결말 */
   totalProfit?: number;
   endingsSeen?: Record<string, true>;

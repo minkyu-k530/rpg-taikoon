@@ -179,6 +179,8 @@ export class Sim {
   scene: Scene | null = null;
   /** 이미 본 컷신. 2회차에서 건너뛰는 데 쓴다 */
   seenScenes: Record<string, true> = {};
+  /** 이미 본 처음 안내와 안내 끄기 설정 */
+  seenHints: Record<string, true> = {};
 
   /**
    * 지금 나가 있는 배달. null이면 가게에 있다.
@@ -239,6 +241,7 @@ export class Sim {
     if (isWeather(data.weather)) this.weather = data.weather;
     if (isWeather(data.tomorrow)) this.tomorrow = data.tomorrow;
     this.seenScenes = { ...data.seenScenes };
+    this.seenHints = { ...data.seenHints };
     this.totalProfit = data.totalProfit ?? 0;
     this.endingsSeen = { ...data.endingsSeen };
     this.resetMolds();
@@ -253,9 +256,22 @@ export class Sim {
       weather: this.weather,
       tomorrow: this.tomorrow,
       seenScenes: this.seenScenes,
+      seenHints: this.seenHints,
       totalProfit: this.totalProfit,
       endingsSeen: this.endingsSeen,
     });
+  }
+
+  markHint(id: string) {
+    if (this.seenHints[id]) return;
+    this.seenHints[id] = true;
+    this.persist();
+  }
+
+  setHintsEnabled(on: boolean) {
+    if (on) delete this.seenHints.off;
+    else this.seenHints.off = true;
+    this.persist();
   }
 
   /** 설정의 '저장 지우기'. 기록까지 전부 없앤다 */
@@ -263,6 +279,7 @@ export class Sim {
     storage.clear();
     this.visits = {};
     this.seenScenes = {};
+    this.seenHints = {};
     this.endingsSeen = {};
     this.newRun();
     storage.clear();
