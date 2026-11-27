@@ -17,36 +17,77 @@ public class BalanceTests
             if (s.CanBuy(key)) s.Buy(key);
         }
     }
-    static (int scoreSum, int scoreCount) Play(Simulation s, bool active, uint botSeed)
+    static (int scoreSum, int scoreCount, int invites, int groupOffered, int groupAccepted, int groupSucceeded) Play(Simulation s, bool active, uint botSeed)
     {
         var bot = new SeedRandom(botSeed);
-        double fishEndAt = 0, cookAt = 0;
+        var inviteBot = new SeedRandom(botSeed + 99173);
+        double fishEndAt = 0;
+        double[] cookAt = new double[8];
         int scoreSum = 0, scoreCount = 0;
         double rollAt = -1;
+        double nextInviteAt = 10;
+        int invites = 0;
+        int groupOffered = 0, groupAccepted = 0, groupSucceeded = 0;
         bool rollHit = false;
         TakoPhase lastPhase = TakoPhase.Empty;
+        GroupOrderState seenOrder = null;
         while (s.Open)
         {
             if (active)
             {
+                if (s.Clock >= nextInviteAt)
+                {
+                    if (s.CanInvite(true))
+                    {
+                        if (inviteBot.Next() < Balance.InviteChance) { if (s.Invite(CustomerKind.General, true)) invites++; }
+                        else s.RecordInviteFailure();
+                    }
+                    nextInviteAt = s.Clock + 15;
+                }
                 if (s.Clock >= s.HawkReady) s.Hawk();
+                if (s.GroupOrder != null && !s.GroupOrder.accepted && s.GroupOrder != seenOrder)
+                {
+                    seenOrder = s.GroupOrder;
+                    groupOffered++;
+                    if (bot.Next() < .7)
+                    {
+                        if (s.AcceptGroupOrder()) groupAccepted++;
+                    }
+                    else s.DeclineGroupOrder();
+                }
+                if (s.GroupOrder != null && s.GroupOrder.accepted && s.GroupOrder.boxCount + s.FishTray.Count >= s.GroupOrder.quantity)
+                    s.MoveTrayToGroupBox();
+                if (s.GroupOrder != null && s.GroupOrder.accepted && s.GroupOrder.boxCount >= s.GroupOrder.quantity && s.DeliverGroupOrder()) groupSucceeded++;
                 if (s.FrontCustomerId >= 0) s.ServeNow(s.FrontCustomerId);
-                var fish = s.Molds[0];
-                if ((fish.phase == FishPhase.Empty || (fish.phase == FishPhase.Baking && fish.automatic)) && !fish.holding)
+                // 단체 주문 상자는 직접 구운 것만 받으므로, 주문 중에는 틀 2개를 번갈아 직접 굽는다. 홀드는 한 번에 하나다.
+                int manualMolds = s.GroupOrder != null && s.GroupOrder.accepted ? Math.Min(2, s.Molds.Count) : 1;
+                int holdingMold = -1;
+                for (int i = 0; i < s.Molds.Count; i++) if (s.Molds[i].holding) holdingMold = i;
+                if (holdingMold >= 0 && s.Clock >= fishEndAt)
                 {
-                    if (s.HoldStart(0)) fishEndAt = s.Clock + 0.46 + (bot.Next() - 0.5) * 0.12;
+                    FishPhase before = s.Molds[holdingMold].phase;
+                    s.HoldEnd(holdingMold);
+                    if (before == FishPhase.Top) cookAt[holdingMold] = (bot.Next() < 0.85 ? Balance.FishCookMin : Balance.FishCookMax) + 0.2 + bot.Next() * 0.4;
+                    holdingMold = -1;
                 }
-                if (fish.phase == FishPhase.RedBean && !fish.holding && s.HoldStart(0)) fishEndAt = s.Clock + 0.8 + (bot.Next() - 0.5) * 0.12;
-                if (fish.phase == FishPhase.Top && !fish.holding && s.HoldStart(0)) fishEndAt = s.Clock + 0.49 + (bot.Next() - 0.5) * 0.12;
-                if (fish.holding && s.Clock >= fishEndAt)
+                for (int i = 0; i < manualMolds && holdingMold < 0; i++)
                 {
-                    FishPhase before = fish.phase;
-                    s.HoldEnd(0);
-                    if (before == FishPhase.Top) cookAt = (bot.Next() < 0.85 ? Balance.FishCookMin : Balance.FishCookMax) + 0.2 + bot.Next() * 0.4;
+                    var fish = s.Molds[i];
+                    double hold = fish.phase == FishPhase.Empty || (fish.phase == FishPhase.Baking && fish.automatic) ? 0.46 :
+                        fish.phase == FishPhase.RedBean ? 0.8 : fish.phase == FishPhase.Top ? 0.49 : -1;
+                    if (hold > 0 && s.HoldStart(i)) { fishEndAt = s.Clock + hold + (bot.Next() - 0.5) * 0.12; holdingMold = i; }
                 }
-                if (fish.phase == FishPhase.Baking && !fish.automatic)
+                for (int i = 0; i < s.Molds.Count; i++)
                 {
-                    if (fish.time >= cookAt && s.TakeOut(0)) { scoreSum += s.FishTray[s.FishTray.Count - 1].Basic; scoreCount++; }
+                    var fish = s.Molds[i];
+                    if (fish.phase != FishPhase.Baking || fish.automatic || fish.time < cookAt[i]) continue;
+                    int beforeBox = s.GroupOrder == null ? 0 : s.GroupOrder.boxCount;
+                    if (s.TakeOut(i))
+                    {
+                        QualityScore baked = s.GroupOrder != null && s.GroupOrder.boxCount > beforeBox ?
+                            s.GroupOrder.box[s.GroupOrder.boxCount - 1] : s.FishTray[s.FishTray.Count - 1];
+                        scoreSum += baked.Basic; scoreCount++;
+                    }
                 }
                 if (s.UpgradeLevel("tako") > 0)
                 {
@@ -66,7 +107,7 @@ public class BalanceTests
             }
             s.Tick(0.1);
         }
-        return (scoreSum, scoreCount);
+        return (scoreSum, scoreCount, invites, groupOffered, groupAccepted, groupSucceeded);
     }
     [Fact, Trait("Category", "Balance")]
     public void HelperLevelTwoImprovesIdleButStaysBelowActive()
@@ -100,6 +141,8 @@ public class BalanceTests
         double offlineRatio = 0;
         int activeHomeSum = 0, idleHomeSum = 0, activeHomeMax = 0, idleHomeMax = 0, activeStationSum = 0, idleStationSum = 0, activeStationMax = 0, idleStationMax = 0;
         int qualitySum = 0, qualityCount = 0;
+        int inviteCount = 0, activeDays = 0;
+        int groupOffered = 0, groupAccepted = 0, groupSucceeded = 0;
         for (uint seed = 1; seed <= seeds; seed++)
         {
             var idle = new Simulation(new SeedRandom(seed));
@@ -126,6 +169,8 @@ public class BalanceTests
                 }
                 Play(idle, false, seed + 1000); var quality = Play(active, true, seed + 1000);
                 qualitySum += quality.scoreSum; qualityCount += quality.scoreCount;
+                inviteCount += quality.invites; activeDays++;
+                groupOffered += quality.groupOffered; groupAccepted += quality.groupAccepted; groupSucceeded += quality.groupSucceeded;
                 if (day <= 80) minIdle = Math.Min(minIdle, idle.Report.profit);
                 if (idle.StationUnlocked && idleStationDay == 0) idleStationDay = day;
                 if (active.StationUnlocked && activeStationDay == 0) activeStationDay = day;
@@ -147,6 +192,8 @@ public class BalanceTests
         output.WriteLine($"idle_min={minIdle} helper_lv2_samples={helperSamples} helper_lv2_mean={((double)helperGain/Math.Max(1,helperSamples)):F0} offline_ratio={offlineRatio/seeds:F3}");
         output.WriteLine($"home_active_mean={(double)activeHomeSum/seeds:F1} home_active_max={activeHomeMax} home_idle_mean={(double)idleHomeSum/seeds:F1} home_idle_max={idleHomeMax}");
         output.WriteLine($"station_active_mean={(double)activeStationSum/seeds:F1} station_active_max={activeStationMax} station_idle_mean={(double)idleStationSum/seeds:F1} station_idle_max={idleStationMax} active_quality_mean={(double)qualitySum/qualityCount:F1} samples={qualityCount}");
+        output.WriteLine($"invite_success_per_active_day={(double)inviteCount/activeDays:F2} invite_success_total={inviteCount} active_days={activeDays}");
+        output.WriteLine($"group_offered={groupOffered} group_accepted={groupAccepted} group_succeeded={groupSucceeded} group_success_rate={(double)groupSucceeded/Math.Max(1,groupAccepted):P1}");
         Assert.True(minIdle > 0);
         for (int i = 0; i < 3; i++) Assert.InRange(activeSum[i] / idleSum[i], 1.6, 2.0);
         Assert.InRange(offlineRatio / seeds, 0.5, 1.5);

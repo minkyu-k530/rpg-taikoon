@@ -38,8 +38,13 @@ namespace Unjungcheon.Core
         public const double TakoAutoLevel0 = 150, TakoAutoLevel1 = 90, TakoAutoLevel2 = 60;
         public const double MaxManualSpeedMultiplier = 1.5;
         public const double HawkDuration = 10, HawkCooldown = 30;
+        public const double InviteChance = 0.6, InviteCooldown = 3;
+        public const double EmployeeShare = 0.35, TraineeShare = 0.30;
+        public const double GroupChance = 0.08, GroupOfferTime = 8, GroupBaseDuration = 20, GroupSecondsPerFish = 8, GroupBonus = 0.25;
+        public const int GroupMin = 6, GroupMax = 16;
+        public const double GlareDecayTime = 20, GuardBanTime = 60;
         public const double HawkSpawnMultiplier = 1.4, ServeTime = 1.2;
-        public const int ServeTip = 700;
+        public const int ServeTip = 600;
         public const int MaxCustomersOnSite = 22;
         public const double SpawnJitterMin = 0.6, SpawnJitterMax = 1.4;
         public const double BrowseTime = 3, BrowseConvertChance = 0.25;
