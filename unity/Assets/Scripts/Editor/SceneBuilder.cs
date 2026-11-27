@@ -34,12 +34,24 @@ namespace Unjungcheon.EditorTools
             Annex(campus);
             Neighbor(campus);
             Plaza(campus);
-            InteractionPoint[] points = Stall(Group("Stall"));
+            Boundaries(env);
+            Entrances(campus);
+            InteractionPoint[] stallPoints = Stall(Group("Stall"));
+            stallPoints[0].MoldIndex = 0; stallPoints[1].MoldIndex = 1;
+            var points = new InteractionPoint[stallPoints.Length + 2];
+            stallPoints.CopyTo(points, 0);
+            points[stallPoints.Length] = Point("경비 부스", InteractionKind.Guard, campus, new Vector3(S.BoothX, Walk, S.BoothZ - 2.4f));
+            points[stallPoints.Length + 1] = Point("층 안내판", InteractionKind.Directory, campus, new Vector3(10.15f, Walk, S.MainFrontZ - 3.6f));
 
             var runner = new GameObject("Game Runner").AddComponent<GameRunner>();
+            foreach (GroupOrderBoxView box in Object.FindObjectsByType<GroupOrderBoxView>(FindObjectsSortMode.None)) box.Runner = runner;
             PlayerController player = Owner(points, runner, out Renderer[] body, out InteractionFinder finder);
+            BuildPedestrians(runner);
             BuildCamera(player, body);
-            Hud(runner, finder);
+            var cooking = player.gameObject.AddComponent<FishCookingController>();
+            cooking.Runner = runner; cooking.Finder = finder; cooking.Camera = Camera.main.GetComponent<CameraRig>();
+            foreach (FishMoldView mold in Object.FindObjectsByType<FishMoldView>(FindObjectsSortMode.None)) mold.Runner = runner;
+            Hud(runner, finder, player);
             var volume = new GameObject("Night Volume").AddComponent<Volume>();
             volume.isGlobal = true;
             volume.sharedProfile = ProjectSetup.NightProfile();
@@ -79,6 +91,30 @@ namespace Unjungcheon.EditorTools
                 material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
                 material.SetColor("_EmissionColor", Color.black);
             }
+            EditorUtility.SetDirty(material);
+            materials.Add(name, material);
+            return material;
+        }
+
+        static Material SteamMat()
+        {
+            const string name = "SteamWhite";
+            if (materials.TryGetValue(name, out Material found)) return found;
+            string path = ProjectSetup.AssetDir + "/" + name + ".mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+                AssetDatabase.CreateAsset(material, path);
+            }
+            material.SetColor("_BaseColor", new Color(1f, 1f, 1f, .38f));
+            material.SetFloat("_Surface", 1f);
+            material.SetFloat("_Blend", 0f);
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_ZWrite", 0f);
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             EditorUtility.SetDirty(material);
             materials.Add(name, material);
             return material;
@@ -305,9 +341,6 @@ namespace Unjungcheon.EditorTools
             Block("Near brick sidewalk", root, new Vector3(-hx, -.3f, S.NearWalkBackZ), new Vector3(hx, Walk, S.NearRoadEdgeZ - S.CurbWidth), Brick, true);
             Block("Near curb", root, new Vector3(-hx, -.3f, S.NearRoadEdgeZ - S.CurbWidth), new Vector3(hx, Walk + .03f, S.NearRoadEdgeZ), Granite, true);
             Block("Near hedge", root, new Vector3(-hx, Walk, S.NearWalkBackZ - .9f), new Vector3(hx, .95f, S.NearWalkBackZ), Boxwood, true);
-            // 도로 쪽 보이지 않는 경계: 경계석을 넘어 도로로 나가지 못한다.
-            Block("Road guard (invisible)", root, new Vector3(-hx, Walk, S.NearRoadEdgeZ - S.CurbWidth), new Vector3(hx, 2.5f, S.NearRoadEdgeZ), Granite, true)
-                .GetComponent<Renderer>().enabled = false;
             // 건너편 보도
             Block("Far sidewalk", root, new Vector3(-hx, -.3f, S.FarRoadEdgeZ + S.CurbWidth), new Vector3(hx, Walk, S.PlazaFrontZ), Granite, true);
             Block("Far curb", root, new Vector3(-hx, -.3f, S.FarRoadEdgeZ), new Vector3(hx, Walk + .03f, S.FarRoadEdgeZ + S.CurbWidth), Granite, true);
@@ -541,13 +574,63 @@ namespace Unjungcheon.EditorTools
                 Shape(PrimitiveType.Sphere, "Bulb", root, new Vector3(-1.75f + i * .5f, 2.14f, 1.2f), Vector3.one * .09f, bulb);
             PointLight("Stall warm light", root, new Vector3(0f, 2.1f, .6f), new Color(1f, .62f, .32f), 2.5f, 9f);
 
-            // 붕어빵 틀 8칸(사장 쪽 왼편), 떡볶이 판·어묵 솥 자리(오른편), 타코야끼 판 자리(앞쪽)
-            for (int i = 0; i < 8; i++)
-                Shape(PrimitiveType.Cylinder, "Fish mold", root, new Vector3(-1.35f + (i % 4) * .5f, 1.16f, -.45f + (i / 4) * .45f), new Vector3(.4f, .03f, .3f), iron);
+            // 수동 조리 틀 두 칸과 상태 게이지.
+            var moldViews = new FishMoldView[2];
+            for (int i = 0; i < moldViews.Length; i++)
+            {
+                float x = -1.28f + i * .56f;
+                var mold = Shape(PrimitiveType.Cylinder, "Fish mold " + i, root,
+                    new Vector3(x, 1.16f, -.43f), new Vector3(.46f, .035f, .34f), iron, true);
+                var view = mold.AddComponent<FishMoldView>(); view.Index = i;
+                var batter = Shape(PrimitiveType.Cylinder, "Batter", root,
+                    new Vector3(x, 1.21f, -.43f), new Vector3(.3f, .02f, .22f), Yellow);
+                view.Batter = batter.transform; view.BatterRenderer = batter.GetComponent<Renderer>();
+                view.Filling = Shape(PrimitiveType.Cylinder, "Red bean", root,
+                    new Vector3(x, 1.27f, -.43f), new Vector3(.18f, .02f, .15f), Mat("RedBean", new Color(.23f, .06f, .06f))).transform;
+                var lidPivot = Group("Mold lid pivot", root); lidPivot.localPosition = new Vector3(x, 1.27f, -.6f);
+                Box("Mold lid", lidPivot, new Vector3(0f, 0f, .17f), new Vector3(.46f, .04f, .34f), iron);
+                view.Lid = lidPivot;
+                view.StatusDot = Shape(PrimitiveType.Sphere, "Mold status", root,
+                    new Vector3(x, 1.43f, -.43f), Vector3.one * .12f, Mat("MoldStatus", Color.white)).GetComponent<Renderer>();
+                var steam = Group("Steam", root); steam.localPosition = new Vector3(x, 1.4f, -.43f);
+                var particles = steam.gameObject.AddComponent<ParticleSystem>();
+                var main = particles.main; main.startLifetime = .8f; main.startSpeed = .35f; main.startSize = .05f;
+                var emission = particles.emission; emission.rateOverTime = 7f;
+                var shape = particles.shape; shape.shapeType = ParticleSystemShapeType.Sphere; shape.radius = .08f;
+                particles.GetComponent<ParticleSystemRenderer>().sharedMaterial = SteamMat();
+                view.Steam = steam; steam.gameObject.SetActive(false);
+                moldViews[i] = view;
+            }
             Shape(PrimitiveType.Cylinder, "Tteokbokki pan", root, new Vector3(.75f, 1.18f, -.3f), new Vector3(.64f, .05f, .64f), iron);
             Shape(PrimitiveType.Cylinder, "Oden pot", root, new Vector3(1.38f, 1.25f, -.3f), new Vector3(.56f, .13f, .56f), iron);
             Box("Takoyaki plate", root, new Vector3(1.05f, 1.15f, .45f), new Vector3(.6f, .05f, .4f), iron);
+            var orderRoot = Group("Group order box controller", root);
+            var orderView = orderRoot.gameObject.AddComponent<GroupOrderBoxView>();
+            var orderVisual = Group("Group order box", orderRoot); orderVisual.localPosition = new Vector3(.15f, 1.25f, .55f);
+            var boxWood = Mat("OrderBoxWood", new Color(.6f, .36f, .18f));
+            Box("Box base", orderVisual, Vector3.zero, new Vector3(.72f, .045f, .52f), boxWood);
+            foreach (float side in new[] { -.34f, .34f }) Box("Box side", orderVisual, new Vector3(side, .11f, 0f), new Vector3(.045f, .22f, .52f), boxWood);
+            foreach (float side in new[] { -.24f, .24f }) Box("Box end", orderVisual, new Vector3(0f, .11f, side), new Vector3(.72f, .22f, .045f), boxWood);
+            orderView.Visual = orderVisual.gameObject;
+            orderView.Fish = new GameObject[16];
+            for (int i = 0; i < orderView.Fish.Length; i++)
+            {
+                orderView.Fish[i] = Shape(PrimitiveType.Sphere, "Order fish " + i, orderVisual,
+                    new Vector3(-.26f + i % 4 * .17f, .045f + i / 8 * .08f, -.15f + (i / 4) % 2 * .3f),
+                    new Vector3(.13f, .055f, .08f), Mat("BakedFish", new Color(.65f, .35f, .11f)));
+                orderView.Fish[i].SetActive(false);
+            }
+            orderVisual.gameObject.SetActive(false);
             Box("Fish display tray", root, new Vector3(-.6f, 1.15f, .55f), new Vector3(.9f, .04f, .4f), top);
+            var trayFish = new GameObject[20];
+            for (int i = 0; i < trayFish.Length; i++)
+            {
+                trayFish[i] = Shape(PrimitiveType.Sphere, "Display fish " + i, root,
+                    new Vector3(-.95f + i % 5 * .17f, 1.22f + i / 10 * .11f, .43f + (i / 5) % 2 * .18f),
+                    new Vector3(.15f, .045f, .08f), Mat("BakedFish", new Color(.65f, .35f, .11f)));
+                trayFish[i].SetActive(false);
+            }
+            for (int i = 0; i < moldViews.Length; i++) moldViews[i].TrayFish = trayFish;
             foreach (float dx in new[] { -.9f, .9f })
                 Shape(PrimitiveType.Cylinder, "Stool", root, new Vector3(dx, .25f, 1.5f), new Vector3(.38f, .22f, .38f), stool, true);
             // 호객 지점 표시: 입간판
@@ -555,9 +638,10 @@ namespace Unjungcheon.EditorTools
 
             return new[]
             {
-                Point("붕어빵 틀", InteractionKind.Mold, root, new Vector3(-.75f, 0f, -1.35f)),
+                Point("붕어빵 틀", InteractionKind.Mold, root, new Vector3(-1.28f, 0f, -1.35f)),
+                Point("붕어빵 틀", InteractionKind.Mold, root, new Vector3(-.72f, 0f, -1.35f)),
                 Point("카운터", InteractionKind.Counter, root, new Vector3(.85f, 0f, -1.35f)),
-                Point("호객", InteractionKind.Hawk, root, new Vector3(-3.2f, 0f, 2.3f)),
+                Point("외치기", InteractionKind.Hawk, root, new Vector3(-3.2f, 0f, 2.3f)),
             };
         }
 
@@ -575,6 +659,115 @@ namespace Unjungcheon.EditorTools
             return point;
         }
 
+        static void Wall(Transform parent, string name, Vector3 center, Vector3 size, Vector3 noticeCenter, Vector3 noticeSize)
+        {
+            var wall = new GameObject(name);
+            wall.transform.SetParent(parent, false);
+            wall.transform.position = center;
+            wall.AddComponent<BoxCollider>().size = size;
+            var notice = new GameObject(name + " notice");
+            notice.transform.SetParent(parent, false);
+            notice.transform.position = noticeCenter;
+            notice.AddComponent<BoxCollider>().size = noticeSize;
+            notice.GetComponent<BoxCollider>().isTrigger = true;
+            notice.AddComponent<BoundaryNotice>();
+        }
+
+        static void Boundaries(Transform root)
+        {
+            Wall(root, "West boundary", new Vector3(-61f, 2f, 30f), new Vector3(1f, 4f, 86f), new Vector3(-59.5f, 1f, 30f), new Vector3(1f, 2f, 86f));
+            Wall(root, "East boundary", new Vector3(61f, 2f, 30f), new Vector3(1f, 4f, 86f), new Vector3(59.5f, 1f, 30f), new Vector3(1f, 2f, 86f));
+            Wall(root, "North boundary", new Vector3(0f, 2f, 73f), new Vector3(122f, 4f, 1f), new Vector3(0f, 1f, 71.5f), new Vector3(122f, 2f, 1f));
+            Wall(root, "South boundary", new Vector3(0f, 2f, -10.2f), new Vector3(122f, 4f, 1f), new Vector3(0f, 1f, -8.9f), new Vector3(122f, 2f, .4f));
+        }
+
+        static void Entrance(Transform parent, string name, Vector3 center, Vector3 size, string message)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = center;
+            var box = go.AddComponent<BoxCollider>();
+            box.size = size; box.isTrigger = true;
+            go.AddComponent<BuildingEntrance>().Message = message;
+        }
+
+        static void Entrances(Transform root)
+        {
+            Entrance(root, "Main entrance refusal", new Vector3(1.75f, 1.2f, 30.9f), new Vector3(7f, 2.4f, 2.9f), "SKALA 구성원이 아니라 들어갈 수 없습니다!");
+            Entrance(root, "Annex entrance refusal", new Vector3(-50f, 1.2f, 44.8f), new Vector3(8f, 2.4f, 2.8f), "관계자 외 출입 금지입니다");
+        }
+
+        static void BuildPedestrians(GameRunner runner)
+        {
+            Transform root = Group("Pedestrians");
+            var manager = root.gameObject.AddComponent<Pedestrians>();
+            manager.Runner = runner;
+            manager.People = new Pedestrian[16];
+            Material[] coats = {
+                Mat("WalkerBlue", new Color(.16f, .27f, .48f)),
+                Mat("WalkerBrown", new Color(.42f, .28f, .22f)),
+                Mat("WalkerGray", new Color(.38f, .4f, .42f)),
+                Mat("WalkerGreen", new Color(.21f, .34f, .27f))
+            };
+            for (int i = 0; i < manager.People.Length; i++)
+            {
+                var go = new GameObject("Pedestrian " + i);
+                go.transform.SetParent(root, false);
+                float x = -38f + i * 5f;
+                float z = i % 4 == 0 ? -6f : i % 4 == 1 ? 5.5f : i % 4 == 2 ? 9f : 17f;
+                Vector3 start = new Vector3(x, Walk, z);
+                Vector3 end = i % 4 == 0 ? new Vector3(18f, Walk, 5.5f) :
+                    i % 4 == 1 ? new Vector3(-38f, Walk, 5.5f) :
+                    i % 4 == 2 ? new Vector3(3f, Walk, 29f) : new Vector3(40f, Walk, 17f);
+                go.transform.position = start;
+                var torso = Box("Torso", go.transform, new Vector3(0f, 1.12f, 0f), new Vector3(.42f, .62f, .25f), coats[i % coats.Length]);
+                Shape(PrimitiveType.Cylinder, "Neck", go.transform, new Vector3(0f, 1.48f, 0f), new Vector3(.11f, .09f, .11f), Mat("WalkerSkin", new Color(.76f, .58f, .45f)));
+                Shape(PrimitiveType.Sphere, "Head", go.transform, new Vector3(0f, 1.67f, 0f), Vector3.one * .25f, Mat("WalkerSkin", new Color(.76f, .58f, .45f)));
+                Shape(PrimitiveType.Sphere, "Hair", go.transform, new Vector3(0f, 1.84f, i % 3 == 0 ? -.03f : 0f), new Vector3(.27f, i % 3 == 1 ? .13f : .09f, .25f), Mat("WalkerHair" + i % 3, new Color(.10f + i % 3 * .09f, .075f, .06f)));
+                var visual = go.AddComponent<PedestrianVisual>();
+                visual.Arms = new Transform[2]; visual.Legs = new Transform[2];
+                var trousers = Mat("WalkerPants" + i % 3, new Color(.1f + i % 3 * .08f, .12f, .17f));
+                for (int side = 0; side < 2; side++)
+                {
+                    float sx = side == 0 ? -.29f : .29f;
+                    var arm = Group("Arm pivot", go.transform); arm.localPosition = new Vector3(sx, 1.36f, 0f);
+                    Box("Upper arm", arm, new Vector3(0f, -.2f, 0f), new Vector3(.13f, .38f, .15f), coats[i % coats.Length]);
+                    Box("Forearm", arm, new Vector3(0f, -.45f, .02f), new Vector3(.12f, .3f, .13f), coats[i % coats.Length]);
+                    visual.Arms[side] = arm;
+                    var leg = Group("Leg pivot", go.transform); leg.localPosition = new Vector3(side == 0 ? -.12f : .12f, .83f, 0f);
+                    Box("Thigh", leg, new Vector3(0f, -.2f, 0f), new Vector3(.18f, .39f, .2f), trousers);
+                    Box("Shin", leg, new Vector3(0f, -.49f, 0f), new Vector3(.16f, .33f, .18f), trousers);
+                    Box("Shoe", leg, new Vector3(0f, -.68f, .08f), new Vector3(.19f, .12f, .31f), DarkMetal);
+                    visual.Legs[side] = leg;
+                }
+                visual.Torso = torso.transform;
+                Unjungcheon.Core.CustomerKind kind = i < 6 ? Unjungcheon.Core.CustomerKind.Employee : i < 11 ? Unjungcheon.Core.CustomerKind.Trainee : Unjungcheon.Core.CustomerKind.General;
+                if (kind != Unjungcheon.Core.CustomerKind.General)
+                {
+                    bool employee = kind == Unjungcheon.Core.CustomerKind.Employee;
+                    var band = employee ? SkRed : Mat("PassBlue", new Color(.18f, .72f, 1f), 0f, .3f, 1.2f);
+                    Box("Lanyard left", go.transform, new Vector3(-.07f, 1.42f, .17f), new Vector3(.025f, .34f, .02f), band, false, new Vector3(0f, 0f, -20f));
+                    Box("Lanyard right", go.transform, new Vector3(.07f, 1.42f, .17f), new Vector3(.025f, .34f, .02f), band, false, new Vector3(0f, 0f, 20f));
+                    var badge = Group("Badge", go.transform); badge.localPosition = new Vector3(0f, 1.2f, .19f);
+                    Box("Card", badge, Vector3.zero, new Vector3(.28f, .32f, .025f),
+                        employee ? Mat("EmployeeCard", Color.white, 0f, .3f, .7f) : band);
+                    if (employee) Box("Card stripe", badge, new Vector3(0f, .075f, .018f), new Vector3(.27f, .085f, .01f), SkRed);
+                    visual.Badge = badge;
+                    var icon = Group("Type icon", go.transform); icon.localPosition = new Vector3(0f, 2.15f, 0f);
+                    Box("Icon plate", icon, Vector3.zero, new Vector3(.42f, .22f, .02f), band);
+                    Sign(employee ? "사원" : "출입", icon, new Vector3(0f, 0f, -.018f), .12f, Color.white);
+                    visual.TypeIcon = icon;
+                    icon.gameObject.SetActive(false);
+                }
+                var person = go.AddComponent<Pedestrian>();
+                person.StartPoint = start; person.EndPoint = end; person.Kind = kind;
+                person.StallPoint = new Vector3(S.StallX, Walk, S.StallZ + 2f + i % 3 * .6f);
+                person.Speed = 1f + (i % 4) * .1f;
+                person.DoorFlow = i % 4 == 2;
+                manager.People[i] = person;
+            }
+        }
+
         // ---------- 사장님 · 카메라 · HUD ----------
 
         static PlayerController Owner(InteractionPoint[] points, GameRunner runner, out Renderer[] body, out InteractionFinder finder)
@@ -589,8 +782,6 @@ namespace Unjungcheon.EditorTools
             cc.stepOffset = .2f;
             cc.minMoveDistance = 0f; // 프레임이 빠르면 한 프레임 이동량이 기본값(1mm)보다 작아 이동이 무시된다
             var player = go.AddComponent<PlayerController>();
-            player.MinX = S.WalkMinX; player.MaxX = S.WalkMaxX;
-            player.MinZ = S.WalkMinZ; player.MaxZ = S.WalkMaxZ;
             var coat = Mat("OwnerCoat", new Color(.29f, .36f, .43f), 0f, .3f);
             var apron = Mat("OwnerApron", new Color(.85f, .82f, .77f), 0f, .3f);
             body = new[]
@@ -627,7 +818,7 @@ namespace Unjungcheon.EditorTools
             go.transform.SetPositionAndRotation(p, r);
         }
 
-        static void Hud(GameRunner runner, InteractionFinder finder)
+        static void Hud(GameRunner runner, InteractionFinder finder, PlayerController player)
         {
             var canvasGo = new GameObject("HUD");
             var canvas = canvasGo.AddComponent<Canvas>();
@@ -664,7 +855,50 @@ namespace Unjungcheon.EditorTools
             hud.Runner = runner;
             hud.Finder = finder;
             hud.Status = MakeText("Status", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -24f), TextAnchor.MiddleLeft, true);
+            // 주문·평판 패널은 상태 아래 왼쪽 열에 둔다. 위쪽 가운데 튜토리얼 카드와 겹치지 않는다.
+            hud.Group = MakeText("Group order", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -84f), TextAnchor.MiddleLeft, true);
+            hud.Group.transform.parent.GetComponent<RectTransform>().sizeDelta = new Vector2(850f, 54f);
+            hud.Group.transform.parent.gameObject.SetActive(false);
+            hud.Risk = MakeText("Reputation", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -144f), TextAnchor.MiddleLeft, true);
+            hud.Risk.transform.parent.GetComponent<RectTransform>().sizeDelta = new Vector2(850f, 54f);
+            hud.Risk.transform.parent.gameObject.SetActive(false);
             hud.Prompt = MakeText("Prompt", new Vector2(.5f, 0f), new Vector2(.5f, 0f), new Vector2(0f, 40f), TextAnchor.MiddleCenter, false);
+            hud.Cooking = player.GetComponent<FishCookingController>();
+            hud.MoldStep = MakeText("Mold step", new Vector2(.5f, 0f), new Vector2(.5f, 0f), new Vector2(0f, 105f), TextAnchor.UpperCenter, true);
+            hud.MoldPanel = hud.MoldStep.transform.parent.gameObject;
+            hud.MoldPanel.GetComponent<RectTransform>().sizeDelta = new Vector2(620f, 98f);
+            var gaugeBack = new GameObject("Mold gauge bar");
+            gaugeBack.transform.SetParent(hud.MoldPanel.transform, false);
+            var gaugeRect = gaugeBack.AddComponent<RectTransform>();
+            gaugeRect.anchorMin = gaugeRect.anchorMax = new Vector2(.5f, 0f);
+            gaugeRect.pivot = new Vector2(.5f, 0f);
+            gaugeRect.anchoredPosition = new Vector2(0f, 17f);
+            gaugeRect.sizeDelta = new Vector2(550f, 22f);
+            gaugeBack.AddComponent<Image>().color = new Color(.16f, .16f, .16f, .95f);
+            var gaugeFill = new GameObject("Mold gauge fill");
+            gaugeFill.transform.SetParent(gaugeBack.transform, false);
+            hud.MoldFill = gaugeFill.AddComponent<RectTransform>();
+            hud.MoldFill.anchorMin = Vector2.zero; hud.MoldFill.anchorMax = new Vector2(0f, 1f);
+            hud.MoldFill.offsetMin = hud.MoldFill.offsetMax = Vector2.zero;
+            gaugeFill.AddComponent<Image>().color = new Color(1f, .78f, .2f, .95f);
+            var gaugeTarget = new GameObject("Mold target band");
+            gaugeTarget.transform.SetParent(gaugeBack.transform, false);
+            hud.MoldTarget = gaugeTarget.AddComponent<RectTransform>();
+            hud.MoldTarget.anchorMin = new Vector2(.45f, 0f); hud.MoldTarget.anchorMax = new Vector2(.5f, 1f);
+            hud.MoldTarget.offsetMin = hud.MoldTarget.offsetMax = Vector2.zero;
+            gaugeTarget.AddComponent<Image>().color = new Color(.1f, 1f, .24f, .75f);
+            hud.MoldPanel.SetActive(false);
+            var toast = canvasGo.AddComponent<Toast>();
+            toast.Message = MakeText("Toast", new Vector2(.5f, .5f), new Vector2(.5f, .5f), Vector2.zero, TextAnchor.MiddleCenter, true);
+            toast.Message.fontSize = 42;
+            toast.Message.transform.parent.GetComponent<RectTransform>().sizeDelta = new Vector2(1100f, 80f);
+            toast.Message.transform.parent.gameObject.SetActive(false);
+            var tutorial = canvasGo.AddComponent<Tutorial>();
+            tutorial.Card = MakeText("Tutorial", new Vector2(.5f, 1f), new Vector2(.5f, 1f), new Vector2(0f, -24f), TextAnchor.MiddleCenter, true);
+            tutorial.Card.transform.parent.GetComponent<RectTransform>().sizeDelta = new Vector2(960f, 54f);
+            tutorial.Card.fontSize = 23;
+            tutorial.Card.transform.parent.gameObject.SetActive(false);
+            tutorial.Player = player; tutorial.Camera = Camera.main.GetComponent<CameraRig>(); tutorial.Finder = finder;
         }
     }
 }
