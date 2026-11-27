@@ -21,6 +21,7 @@
     <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.TextRenderingModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.AudioModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.AudioModule.dll</HintPath></Reference>
     <Reference Include="UnityEditor" Condition="'$(BuildEditor)' == 'true'"><HintPath>$(UnityManaged)/UnityEditor.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.ParticleSystemModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.PhysicsModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.InputLegacyModule.dll</HintPath></Reference>
     <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.IMGUIModule.dll</HintPath></Reference>

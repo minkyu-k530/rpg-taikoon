@@ -2,17 +2,17 @@ using UnityEngine;
 
 namespace Unjungcheon.Game
 {
-    // 사장님 이동. 속도는 웹 버전과 같다. 보도 영역 밖(도로)으로는 나가지 못한다.
+    // 장면의 충돌체가 이동 가능한 영역을 정한다.
     [RequireComponent(typeof(CharacterController))]
     public sealed class PlayerController : MonoBehaviour
     {
         public const float WalkSpeed = 2.2f;
         public const float RunSpeed = 3.4f;
-        public float MinX = -40f, MaxX = 40f, MinZ = -8.7f, MaxZ = -4.5f;
         public IGameInput InputSource { get; set; }
         // 1인칭에서는 시선 방향 기준으로 걷는다. 3인칭은 0(캠퍼스 쪽이 위).
         public float MoveYaw { get; set; }
         CharacterController controller;
+        float verticalSpeed;
 
         void Awake()
         {
@@ -23,15 +23,20 @@ namespace Unjungcheon.Game
         void Update()
         {
             Vector2 move = Vector2.ClampMagnitude(InputSource.Move, 1f);
-            if (move.sqrMagnitude < 0.0001f) return;
+            if (controller.isGrounded)
+            {
+                if (verticalSpeed < 0f) verticalSpeed = -1f;
+                if (InputSource.Jump) verticalSpeed = 4.43f;
+            }
+            verticalSpeed -= 9.8f * Time.deltaTime;
             Vector3 direction = Quaternion.Euler(0f, MoveYaw, 0f) * new Vector3(move.x, 0f, move.y);
-            Vector3 displacement = direction * ((InputSource.Run ? RunSpeed : WalkSpeed) * Time.deltaTime);
-            Vector3 p = transform.position;
-            displacement.x = Mathf.Clamp(p.x + displacement.x, MinX, MaxX) - p.x;
-            displacement.z = Mathf.Clamp(p.z + displacement.z, MinZ, MaxZ) - p.z;
-            controller.Move(displacement);
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction),
-                Mathf.Min(1f, Time.deltaTime * 9f));
+            float control = controller.isGrounded ? 1f : .5f;
+            Vector3 displacement = direction * ((InputSource.Run ? RunSpeed : WalkSpeed) * control * Time.deltaTime);
+            displacement.y = verticalSpeed * Time.deltaTime;
+            CollisionFlags hit = controller.Move(displacement);
+            if ((hit & CollisionFlags.Above) != 0 && verticalSpeed > 0f) verticalSpeed = 0f;
+            if (direction.sqrMagnitude > .0001f)
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), Mathf.Min(1f, Time.deltaTime * 9f));
         }
     }
 }

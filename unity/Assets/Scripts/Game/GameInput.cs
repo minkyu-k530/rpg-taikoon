@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 
 namespace Unjungcheon.Game
 {
-    // 이동 벡터, 달리기, 상호작용(E/Space), 시점 전환(V), 시선(마우스 델타).
+    // 이동 벡터, 달리기, 상호작용(E), 점프(Space), 시점 전환(V), 시선.
     // 프로젝트 입력 설정에 따라 Input System 또는 Input Manager 구현을 쓴다.
     public interface IGameInput
     {
@@ -13,7 +13,12 @@ namespace Unjungcheon.Game
         Vector2 Look { get; }
         bool Run { get; }
         bool InteractDown { get; }
+        bool GroupAcceptDown { get; }
+        bool GroupDeclineDown { get; }
+        bool Jump { get; }
         bool ViewDown { get; }
+        bool SkipDown { get; }
+        bool RestartDown { get; }
     }
 
 #if ENABLE_INPUT_SYSTEM
@@ -26,8 +31,13 @@ namespace Unjungcheon.Game
         // 레거시 "Mouse X/Y" 축과 같은 단위(픽셀 x 0.1)로 맞춘다.
         public Vector2 Look => Mouse.current == null ? Vector2.zero : Mouse.current.delta.ReadValue() * 0.1f;
         public bool Run => Held(Key.LeftShift, Key.RightShift);
-        public bool InteractDown => Keyboard.current != null && (Keyboard.current.eKey.wasPressedThisFrame || Keyboard.current.spaceKey.wasPressedThisFrame);
+        public bool InteractDown => Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
+        public bool GroupAcceptDown => Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame;
+        public bool GroupDeclineDown => Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame;
+        public bool Jump => Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
         public bool ViewDown => Keyboard.current != null && Keyboard.current.vKey.wasPressedThisFrame;
+        public bool SkipDown => Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+        public bool RestartDown => Keyboard.current != null && Keyboard.current.f1Key.wasPressedThisFrame;
     }
 #endif
 
@@ -40,8 +50,13 @@ namespace Unjungcheon.Game
             (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) ? 1 : 0));
         public Vector2 Look => new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
         public bool Run => Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-        public bool InteractDown => Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Space);
+        public bool InteractDown => Input.GetKeyDown(KeyCode.E);
+        public bool GroupAcceptDown => Input.GetKeyDown(KeyCode.F);
+        public bool GroupDeclineDown => Input.GetKeyDown(KeyCode.Q);
+        public bool Jump => Input.GetKeyDown(KeyCode.Space);
         public bool ViewDown => Input.GetKeyDown(KeyCode.V);
+        public bool SkipDown => Input.GetKeyDown(KeyCode.Escape);
+        public bool RestartDown => Input.GetKeyDown(KeyCode.F1);
     }
 #endif
 
@@ -65,6 +80,11 @@ namespace Unjungcheon.Game
         public Vector2 Look => Vector2.zero;
         public bool Run => false;
         public bool InteractDown => false;
+        public bool GroupAcceptDown => false;
+        public bool GroupDeclineDown => false;
+        public bool Jump => false;
         public bool ViewDown => false;
+        public bool SkipDown => false;
+        public bool RestartDown => false;
     }
 }
