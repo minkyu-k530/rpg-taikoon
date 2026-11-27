@@ -1,0 +1,5 @@
+{
+  "name": "Unjungcheon.EditorTools",
+  "references": ["Unjungcheon.Game", "Unjungcheon.Core", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime", "Unity.UGUI"],
+  "includePlatforms": ["Editor"]
+}

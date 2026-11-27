@@ -1,0 +1,5 @@
+{
+  "name": "Unjungcheon.Game",
+  "references": ["Unjungcheon.Core", "Unity.InputSystem", "Unity.UGUI"],
+  "autoReferenced": true
+}
