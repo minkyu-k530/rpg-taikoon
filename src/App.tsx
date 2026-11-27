@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Environment } from './scene/Environment';
 import { Weather } from './scene/Weather';
 import { Stall } from './scene/Stall';
 import { Crowd } from './scene/Crowd';
+import { Player } from './scene/Player';
 import { HUD } from './ui/HUD';
 import { DeliveryScene } from './scene/DeliveryScene';
 import { DeliveryHUD } from './ui/DeliveryHUD';
@@ -12,6 +13,8 @@ import { sim, useSnapshot } from './game/useSim';
 import { audio } from './game/audio';
 
 export default function App() {
+  const [playerPrompt, setPlayerPrompt] = useState<string | null>(null);
+  const onPromptChange = useCallback((value: string | null) => setPlayerPrompt(value), []);
   // 브라우저는 첫 입력 전에는 소리를 막는다. 어디를 누르든 그때 오디오를 깨운다
   useEffect(() => {
     sim.onEvent = (e) => audio.play(e);
@@ -46,12 +49,13 @@ export default function App() {
             <CameraRig />
             <Environment />
             <Stall />
+            <Player onPromptChange={onPromptChange} />
             <Crowd />
             <Weather />
           </>
         )}
       </Canvas>
-      {delivering ? <DeliveryHUD /> : <HUD />}
+      {delivering ? <DeliveryHUD /> : <HUD playerPrompt={playerPrompt} />}
     </div>
   );
 }

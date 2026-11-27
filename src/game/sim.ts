@@ -206,6 +206,9 @@ export class Sim {
 
   private nextId = 1;
   private spawnTimer = 0;
+  serveReadyAt = 0;
+  hawkReadyAt = 0;
+  hawkUntil = 0;
 
   constructor() {
     this.resetMolds();
@@ -414,6 +417,30 @@ export class Sim {
     return true;
   }
 
+  /** 줄 맨 앞 손님을 바로 응대한다. 재고가 없으면 아무 비용이나 보상도 없다. */
+  serveNow(): boolean {
+    if (!this.open || this.delivery || this.clock < this.serveReadyAt) return false;
+    const v = this.queue[0];
+    if (!v || (v.phase !== 'queue' && v.phase !== 'serve')) return false;
+    const before = this.stats.revenue;
+    if (!this.serveFront(v)) return false;
+    const tip = Math.round((this.stats.revenue - before) * CONFIG.serveNow.tipRate);
+    this.money += tip;
+    this.stats.revenue += tip;
+    this.queue.shift();
+    this.finishServe(v);
+    this.serveReadyAt = this.clock + CONFIG.serveNow.cooldown;
+    return true;
+  }
+
+  /** 산책로에서 호객한다. 인원 상한은 기존 생성 루프가 지킨다. */
+  hawk(): boolean {
+    if (!this.open || this.delivery || this.clock < this.hawkReadyAt) return false;
+    this.hawkUntil = this.clock + CONFIG.hawk.duration;
+    this.hawkReadyAt = this.clock + CONFIG.hawk.cooldown;
+    return true;
+  }
+
   // ---------------------------------------------------------------- 손님 생성
 
   /** 가족 같은 사이가 된 단골은 다른 손님을 데려온다 (GDD 7-2) */
@@ -443,7 +470,8 @@ export class Sim {
   private updateSpawn(dt: number) {
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
-    const rate = (1 + 0.3 * this.upg.sign + this.referralBonus + this.decorSpawn) * WEATHER[this.weather].spawn;
+    const rate = (1 + 0.3 * this.upg.sign + this.referralBonus + this.decorSpawn) * WEATHER[this.weather].spawn
+      * (this.clock < this.hawkUntil ? CONFIG.hawk.multiplier : 1);
     this.spawnTimer = (CONFIG.spawnInterval / rate) * rand(0.6, 1.4);
     if (this.villagers.length >= CONFIG.maxVillagers) return;
     const def = this.pickResident();
@@ -633,17 +661,7 @@ export class Sim {
         if (this.serveFront(v)) {
           const q = this.queue.indexOf(v);
           if (q >= 0) this.queue.splice(q, 1);
-          v.phase = 'eat';
-          v.carrying = true;
-          v.timer = rand(5, 9) * WEATHER[this.weather].linger * this.decorLinger;
-          if (this.upg.table > 0) {
-            // 테이블이 있으면 앉아서 먹는다. 가게 앞이 북적여 보인다
-            v.spotX = LAYOUT.stall.x - 3.4 + rand(-0.5, 0.5);
-            v.spotZ = -2.1 + rand(-0.3, 0.3);
-          } else {
-            v.spotX = LAYOUT.stall.x + rand(-5, 3);
-            v.spotZ = rand(-3.4, -2.6);
-          }
+          this.finishServe(v);
         } else {
           // 재고가 없다. 기다려 주다가 조용히 떠난다 (호감도 변화 없음)
           v.patience -= dt;
@@ -678,6 +696,20 @@ export class Sim {
         if (v.x > LAYOUT.maxX + 1.5 || v.x < LAYOUT.minX - 1.5) this.remove(index);
         break;
       }
+    }
+  }
+
+  /** 맨 앞 손님에게 판매. 팔았으면 true */
+  private finishServe(v: Villager) {
+    v.phase = 'eat';
+    v.carrying = true;
+    v.timer = rand(5, 9) * WEATHER[this.weather].linger * this.decorLinger;
+    if (this.upg.table > 0) {
+      v.spotX = LAYOUT.stall.x - 3.4 + rand(-0.5, 0.5);
+      v.spotZ = -2.1 + rand(-0.3, 0.3);
+    } else {
+      v.spotX = LAYOUT.stall.x + rand(-5, 3);
+      v.spotZ = rand(-3.4, -2.6);
     }
   }
 
@@ -925,6 +957,9 @@ export class Sim {
 
   /** 2회차. 관계와 본 것은 남기고 날짜만 되돌린다 (docs/STORY.md 6장) */
   newRun() {
+    this.serveReadyAt = 0;
+    this.hawkReadyAt = 0;
+    this.hawkUntil = 0;
     this.day = 1;
     this.money = CONFIG.startMoney;
     this.upg = emptyUpgrades();
@@ -950,6 +985,9 @@ export class Sim {
   }
 
   nextDay() {
+    this.serveReadyAt = 0;
+    this.hawkReadyAt = 0;
+    this.hawkUntil = 0;
     this.day++;
     this.weather = this.tomorrow;
     // 내일 날씨는 내일이 속한 계절로 뽑는다. 장이 넘어가는 날 계절이 바뀐다

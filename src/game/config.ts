@@ -13,6 +13,17 @@ export const LAYOUT = {
   laneMaxZ: -1.7,
   /** 포장마차 위치 (카메라 기준 뒤쪽, -Z 방향을 바라봄) */
   stall: { x: 5, z: 0.6 },
+  player: {
+    start: { x: 5.1, z: -1.42 },
+    bounds: { minX: 0, maxX: 8.5, minZ: -4.35, maxZ: 2.18 },
+    stallBlock: { minX: 3.05, maxX: 6.95, minZ: -0.65, maxZ: 1.65 },
+    radius: 0.18,
+    walkSpeed: 2.2,
+    runSpeed: 3.4,
+    interactRadius: 0.72,
+    counter: { x: 5, z: -1.12 },
+    hawk: { x: 2.1, z: -3.15 },
+  },
   /** 카운터 앞면 Z */
   counterZ: -0.3,
   /** 난간 / 하천 / 건너편 */
@@ -60,6 +71,8 @@ export const CONFIG = {
    */
   spawnInterval: 2.5,
   maxVillagers: 22,
+  serveNow: { tipRate: 0.1, cooldown: 1.5 },
+  hawk: { multiplier: 1.5, duration: 10, cooldown: 30 },
   buyChance: 0.18,
   /** 온풍기 레벨당 구매 확률 가산 */
   heaterBuyBonus: 0.05,

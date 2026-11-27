@@ -24,8 +24,6 @@ export function Stall() {
 
   return (
     <group>
-      {/* 가게를 지키는 사람. 비어 있는 노점은 아무리 예뻐도 죽은 화면이다 */}
-      <Keeper x={S.x - 0.5} color="#4a5c6e" skin="#dcae87" />
       {snap.upg.helper > 0 && <Keeper x={S.x + 1.0} color="#6b4a2f" skin="#e8c3a0" offset={1.7} />}
 
       {/* 몸체 */}
