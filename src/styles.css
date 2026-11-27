@@ -743,6 +743,154 @@ canvas {
   cursor: default;
 }
 
+/* 처음 안내는 조작을 가리지 않고 해당 기능 곁에만 놓는다 */
+.coach-target {
+  outline: 2px solid rgba(255, 221, 156, 0.9);
+  outline-offset: 3px;
+}
+
+.coach {
+  position: absolute;
+  z-index: 10;
+  width: min(320px, calc(100% - 28px));
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 178, 87, 0.55);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--fg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+
+.coach p {
+  margin: 0 0 9px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.coach button {
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(255, 178, 87, 0.16);
+  color: var(--warm);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.coach-at-mold,
+.coach-at-offer {
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 190px);
+}
+
+.coach-at-offer {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 315px);
+}
+
+/* 부탁 카드가 있으면 우선 안내인 뒤집기 말풍선도 카드 위에 둔다 */
+.offer ~ .coach-at-mold {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 360px);
+}
+
+.coach-at-clock {
+  top: calc(env(safe-area-inset-top, 0px) + 80px);
+  left: 14px;
+}
+
+.coach-at-book {
+  top: calc(env(safe-area-inset-top, 0px) + 58px);
+  right: 14px;
+}
+
+.coach-at-upgrades {
+  position: static;
+  width: 100%;
+  margin-top: 14px;
+}
+
+@media (max-aspect-ratio: 0.95) {
+  .coach-at-mold { bottom: calc(env(safe-area-inset-bottom, 0px) + 245px); }
+  .coach-at-offer { bottom: calc(env(safe-area-inset-bottom, 0px) + 325px); }
+  .offer ~ .coach-at-mold { bottom: calc(env(safe-area-inset-bottom, 0px) + 390px); }
+  .coach-at-clock,
+  .coach-at-book { top: calc(env(safe-area-inset-top, 0px) + 96px); }
+}
+
+@media (max-height: 600px) and (min-aspect-ratio: 1) {
+  .coach-at-clock,
+  .coach-at-book {
+    top: calc(env(safe-area-inset-top, 0px) + 84px);
+  }
+
+  .coach-at-offer,
+  .offer ~ .coach-at-mold,
+  .offer ~ .coach-at-clock,
+  .offer ~ .coach-at-book {
+    top: auto;
+    right: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 126px);
+    left: 14px;
+    transform: none;
+    width: calc((100% - min(420px, 100% - 28px)) / 2 - 22px);
+    padding: 8px 9px;
+  }
+
+  .coach-at-offer p,
+  .offer ~ .coach-at-mold p,
+  .offer ~ .coach-at-clock p,
+  .offer ~ .coach-at-book p {
+    margin-bottom: 6px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .coach-at-offer button,
+  .offer ~ .coach-at-mold button,
+  .offer ~ .coach-at-clock button,
+  .offer ~ .coach-at-book button {
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 699px) and (max-height: 600px) and (min-aspect-ratio: 1) {
+  /* 부탁 카드가 가운데를 차지하는 크기에서는 대상 강조만 남긴다 */
+  .offer ~ .coach { display: none; }
+
+  .coach-at-mold { bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); }
+  .hud-bottom:has(.mold:nth-child(6)) ~ .coach-at-mold {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 170px);
+  }
+
+  .coach-at-clock { top: calc(env(safe-area-inset-top, 0px) + 84px); }
+  .coach-at-book { top: calc(env(safe-area-inset-top, 0px) + 84px); }
+
+  .coach-at-mold,
+  .coach-at-clock,
+  .coach-at-book {
+    padding: 8px 9px;
+  }
+
+  .coach-at-mold p,
+  .coach-at-clock p,
+  .coach-at-book p {
+    margin-bottom: 6px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .coach-at-mold button,
+  .coach-at-clock button,
+  .coach-at-book button {
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+}
+
 .u-name {
   font-size: 14px;
   font-weight: 600;
